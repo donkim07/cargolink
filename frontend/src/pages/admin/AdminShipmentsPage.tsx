@@ -97,7 +97,7 @@ export default function AdminShipmentsPage() {
 
   return (
     <AdminPageShell title="Shipments" description="View, edit, assign, and cancel all shipments">
-      <DataTable columns={columns} data={shipments} />
+      <DataTable columns={columns} data={shipments} minWidth="760px" />
 
       <Dialog open={!!assignId} onOpenChange={(o) => !o && setAssignId(null)}>
         <DialogContent>

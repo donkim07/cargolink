@@ -42,7 +42,12 @@ async def create_auction(data: AuctionCreate, current_user: User, db: AsyncSessi
     )
     db.add(auction)
     await db.flush()
-    return auction
+    result = await db.execute(
+        select(Auction)
+        .options(selectinload(Auction.bids), selectinload(Auction.shipment))
+        .where(Auction.id == auction.id)
+    )
+    return result.scalar_one()
 
 
 async def list_auctions(
@@ -63,7 +68,21 @@ async def list_auctions(
         query = query.where(Auction.status == status_filter)
 
     result = await db.execute(query.order_by(Auction.ends_at.asc()))
-    return list(result.scalars().unique().all())
+    auctions = list(result.scalars().unique().all())
+
+    now = datetime.now(UTC)
+    changed = False
+    for auction in auctions:
+        if auction.status == AuctionStatus.OPEN and now > auction.ends_at:
+            auction.status = AuctionStatus.CLOSED
+            changed = True
+    if changed:
+        await db.flush()
+
+    if open_only and not customer_id:
+        auctions = [a for a in auctions if a.status == AuctionStatus.OPEN]
+
+    return auctions
 
 
 async def place_bid(

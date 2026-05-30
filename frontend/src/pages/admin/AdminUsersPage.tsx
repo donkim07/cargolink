@@ -90,7 +90,7 @@ export default function AdminUsersPage() {
 
   return (
     <AdminPageShell title="Users" description="View, edit, and deactivate platform users">
-      {isLoading ? <p>Loading...</p> : <DataTable columns={columns} data={users} />}
+      {isLoading ? <p>Loading...</p> : <DataTable columns={columns} data={users} minWidth="720px" />}
 
       <Dialog open={!!viewUser} onOpenChange={(o) => !o && setViewUser(null)}>
         <DialogContent>

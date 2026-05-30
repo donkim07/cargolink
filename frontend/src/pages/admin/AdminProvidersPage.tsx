@@ -83,7 +83,7 @@ export default function AdminProvidersPage() {
 
   return (
     <AdminPageShell title="Providers" description="Approve, edit, and revoke transport providers">
-      {isLoading ? <p>Loading...</p> : <DataTable columns={columns} data={providers} />}
+      {isLoading ? <p>Loading...</p> : <DataTable columns={columns} data={providers} minWidth="680px" />}
 
       <Dialog open={!!viewProvider} onOpenChange={(o) => !o && setViewProvider(null)}>
         <DialogContent>

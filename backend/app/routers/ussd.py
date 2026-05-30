@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -34,13 +35,14 @@ HAZARD_TYPES = {
 }
 
 
-@router.post("/callback")
-async def ussd_callback(
-    session_id: str = Form(...),
-    phone_number: str = Form(...),
-    text: str = Form(default=""),
-    db: AsyncSession = Depends(get_db),
-):
+def _parse_ussd_form(form) -> tuple[str, str, str]:
+    session_id = str(form.get("sessionId") or form.get("session_id") or "").strip()
+    phone_number = str(form.get("phoneNumber") or form.get("phone_number") or "").strip()
+    text = str(form.get("text") or "").strip()
+    return session_id, phone_number, text
+
+
+async def process_ussd(session_id: str, phone_number: str, text: str, db: AsyncSession) -> str:
     redis = await get_redis()
     session_key = f"ussd:session:{session_id}"
     parts = [p.strip() for p in text.split("*") if p.strip()] if text else []
@@ -135,6 +137,15 @@ async def ussd_callback(
         return _end(f"Contact: {SUPPORT_LINE}\nUSSD: {USSD_CODE}")
 
     return _end("Invalid option. Dial again.")
+
+
+@router.post("/callback", response_class=PlainTextResponse)
+async def ussd_callback(request: Request, db: AsyncSession = Depends(get_db)):
+    form = await request.form()
+    session_id, phone_number, text = _parse_ussd_form(form)
+    if not session_id or not phone_number:
+        return PlainTextResponse("END Invalid USSD request", status_code=400)
+    return await process_ussd(session_id, phone_number, text, db)
 
 
 async def _track_shipment(tracking_code: str, db: AsyncSession, brief: bool) -> str:

@@ -37,7 +37,7 @@ async def create_auction(
     db: AsyncSession = Depends(get_db),
 ):
     auction = await auction_service.create_auction(data, current_user, db)
-    return AuctionResponse.model_validate(auction)
+    return _enrich_auction(auction)
 
 
 @router.get("", response_model=list[AuctionResponse])

@@ -113,6 +113,7 @@ async def update_shipment(shipment_id: UUID, data: dict, db: AsyncSession) -> Sh
     if "status" in data and data["status"] is not None:
         shipment.status = data["status"]
     await db.flush()
+    await db.refresh(shipment)
     return shipment
 
 
