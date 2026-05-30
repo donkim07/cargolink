@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.redis import close_redis
-from app.routers import admin, auctions, auth, notifications, payments, providers, search, shared_cargo, shipments, ussd
+from app.routers import admin, auctions, auth, notifications, payments, providers, search, shared_cargo, shipments, tracking, ussd
 from app.services.seed import seed_demo_data
 
 
@@ -42,6 +42,7 @@ app.include_router(shared_cargo.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(tracking.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(ussd.router, prefix="/api")
 

@@ -98,6 +98,16 @@ export const sharedCargoApi = {
     api.post(`/shared-cargo/${id}/book`, { tons_booked, cargo_description }),
 }
 
+export const trackingApi = {
+  get: (trackingCode: string) => api.get(`/tracking/${trackingCode}`),
+  updateStatus: (trackingCode: string, status: string, deliveryOtp?: string) =>
+    api.post(`/tracking/${trackingCode}/status`, { status, delivery_otp: deliveryOtp }),
+  checkpoint: (trackingCode: string, region: string) =>
+    api.post(`/tracking/${trackingCode}/checkpoint`, { region }),
+  reportHazard: (data: { route_label: string; hazard_type: string; location: string }) =>
+    api.post('/tracking/hazards/report', data),
+}
+
 export const paymentsApi = {
   initiate: (data: Record<string, unknown>) => api.post('/payments/initiate', data),
   status: (reference: string) => api.get<Payment>(`/payments/status/${reference}`),

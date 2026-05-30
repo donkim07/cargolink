@@ -1,4 +1,4 @@
-import { Loader } from '@googlemaps/js-api-loader'
+import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 
 let loaderPromise: Promise<typeof google> | null = null
 
@@ -12,16 +12,18 @@ function getMapsApiKey(): string {
   return key
 }
 
-export function loadGoogleMaps(): Promise<typeof google> {
+export async function loadGoogleMaps(): Promise<typeof google> {
   if (!loaderPromise) {
-    const loader = new Loader({
-      apiKey: getMapsApiKey(),
-      version: 'weekly',
+    setOptions({
+      key: getMapsApiKey(),
+      v: 'weekly',
       libraries: ['places'],
     })
-    loaderPromise = loader.load()
+    loaderPromise = Promise.all([
+      importLibrary('maps'),
+      importLibrary('places'),
+      importLibrary('marker'),
+    ]).then(() => google)
   }
   return loaderPromise
 }
-
-export { Loader }

@@ -16,6 +16,7 @@ from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.schemas.provider import ProviderDashboard, ProviderRegister, VehicleCreate
 from app.services.pricing import calculate_cost
+from app.services.tracking import notify_booking_accepted
 
 
 async def list_providers(
@@ -226,20 +227,10 @@ async def book_with_provider(
     )
     shipment.status = ShipmentStatus.BOOKED
     db.add(booking)
-
-    customer_result = await db.execute(select(User).where(User.id == shipment.customer_id))
-    customer = customer_result.scalar_one_or_none()
-    if customer:
-        db.add(
-            Notification(
-                user_id=customer.id,
-                type=NotificationType.BOOKING_UPDATE,
-                title="Booking Confirmed",
-                message=f"Provider {provider.company_name} assigned. Tracking: {tracking_code}",
-            )
-        )
-
     await db.flush()
+
+    await notify_booking_accepted(booking, db)
+
     return booking
 
 
