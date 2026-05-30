@@ -27,6 +27,15 @@ async def send_otp(
     return MessageResponse(**result)
 
 
+@router.post("/resend-otp", response_model=MessageResponse)
+async def resend_otp(
+    data: SendOTPRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await auth_service.resend_otp(data.phone, data.purpose, db)
+    return MessageResponse(**result)
+
+
 @router.post("/verify-otp", response_model=AuthResponse)
 async def verify_otp(
     data: VerifyOTPRequest,

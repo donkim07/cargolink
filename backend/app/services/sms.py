@@ -1,21 +1,9 @@
-import asyncio
-from functools import partial
-
-import africastalking
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.enums import SMSStatus
 from app.models.sms_log import SMSLog
-
-_initialized = False
-
-
-def _ensure_initialized() -> None:
-    global _initialized
-    if not _initialized and settings.at_api_key:
-        africastalking.initialize(settings.at_username, settings.at_api_key)
-        _initialized = True
+from app.services.at_client import send_sms_message
 
 
 async def send_sms(phone: str, message: str, purpose: str, db: AsyncSession) -> SMSLog:
@@ -28,16 +16,7 @@ async def send_sms(phone: str, message: str, purpose: str, db: AsyncSession) -> 
         return log
 
     try:
-        _ensure_initialized()
-        sms = africastalking.SMS
-        loop = asyncio.get_event_loop()
-        send_fn = partial(
-            sms.send,
-            message,
-            [phone],
-            sender_id=settings.at_sms_sender or None,
-        )
-        response = await loop.run_in_executor(None, send_fn)
+        response = await send_sms_message(phone, message, sender_id=settings.at_sms_sender or None)
         recipients = response.get("SMSMessageData", {}).get("Recipients", [])
         if recipients and recipients[0].get("status") == "Success":
             log.status = SMSStatus.SENT

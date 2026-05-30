@@ -1,36 +1,63 @@
+import secrets
 from datetime import UTC, datetime, timedelta
 
-from afri_auth import OTPAuth
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.redis import get_redis
 from app.core.security import create_access_token, create_refresh_token, verify_token
 from app.models.enums import OTPPurpose, UserRole
 from app.models.otp import OTPCode
 from app.models.user import User
 from app.schemas.auth import AuthResponse, UserResponse
+from app.services.at_client import AfricasTalkingSMSError, send_sms_message
 
-_otp_auth: OTPAuth | None = None
+OTP_EXPIRY_SECONDS = 300
+OTP_RESEND_COOLDOWN_SECONDS = 60
+OTP_REDIS_PREFIX = "otp:"
+OTP_RESEND_PREFIX = "otp:resend:"
 
 
-def get_otp_auth() -> OTPAuth:
-    global _otp_auth
-    if _otp_auth is None:
-        _otp_auth = OTPAuth(
-            username=settings.at_username,
-            api_key=settings.at_api_key,
+def _generate_otp() -> str:
+    return str(secrets.randbelow(900000) + 100000)
+
+
+async def _check_resend_cooldown(phone: str) -> None:
+    redis = await get_redis()
+    ttl = await redis.ttl(f"{OTP_RESEND_PREFIX}{phone}")
+    if ttl > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Please wait {ttl} seconds before requesting a new code",
+            headers={"Retry-After": str(ttl)},
         )
-    return _otp_auth
 
 
-async def send_otp(phone: str, purpose: OTPPurpose, db: AsyncSession) -> dict:
-    otp = get_otp_auth()
+async def send_otp(phone: str, purpose: OTPPurpose, db: AsyncSession, *, is_resend: bool = False) -> dict:
+    if is_resend:
+        await _check_resend_cooldown(phone)
+
+    code = _generate_otp()
+    redis = await get_redis()
+    await redis.setex(f"{OTP_REDIS_PREFIX}{phone}", OTP_EXPIRY_SECONDS, code)
+    await redis.setex(f"{OTP_RESEND_PREFIX}{phone}", OTP_RESEND_COOLDOWN_SECONDS, "1")
+
+    message = f"Your CargoLink OTP is {code}. Expires in 5 minutes."
 
     try:
-        result = await otp.send_otp(phone)
+        await send_sms_message(phone, message, sender_id=settings.at_sms_sender or None)
+    except AfricasTalkingSMSError as exc:
+        await redis.delete(f"{OTP_REDIS_PREFIX}{phone}")
+        await redis.delete(f"{OTP_RESEND_PREFIX}{phone}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to send OTP: {exc}",
+        ) from exc
     except Exception as exc:
+        await redis.delete(f"{OTP_REDIS_PREFIX}{phone}")
+        await redis.delete(f"{OTP_RESEND_PREFIX}{phone}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Failed to send OTP: {exc}",
@@ -40,15 +67,20 @@ async def send_otp(phone: str, purpose: OTPPurpose, db: AsyncSession) -> dict:
         phone=phone,
         code_hash="redis-managed",
         purpose=purpose,
-        expires_at=datetime.now(UTC) + timedelta(minutes=5),
+        expires_at=datetime.now(UTC) + timedelta(seconds=OTP_EXPIRY_SECONDS),
     )
     db.add(otp_record)
     await db.flush()
 
     return {
-        "message": result.get("message", "OTP sent"),
-        "expires_in": result.get("expires_in", 300),
+        "message": "OTP sent successfully",
+        "expires_in": OTP_EXPIRY_SECONDS,
+        "resend_available_in": OTP_RESEND_COOLDOWN_SECONDS,
     }
+
+
+async def resend_otp(phone: str, purpose: OTPPurpose, db: AsyncSession) -> dict:
+    return await send_otp(phone, purpose, db, is_resend=True)
 
 
 async def verify_otp_and_login(
@@ -60,21 +92,23 @@ async def verify_otp_and_login(
     email: str | None = None,
     role: UserRole = UserRole.CUSTOMER,
 ) -> AuthResponse:
-    otp = get_otp_auth()
+    redis = await get_redis()
+    stored_code = await redis.get(f"{OTP_REDIS_PREFIX}{phone}")
 
-    try:
-        result = await otp.verify_otp(phone=phone, code=code)
-    except Exception as exc:
+    if not stored_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"OTP verification failed: {exc}",
-        ) from exc
-
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Invalid or expired OTP"),
+            detail="OTP expired",
         )
+
+    if stored_code != code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP",
+        )
+
+    await redis.delete(f"{OTP_REDIS_PREFIX}{phone}")
+    await redis.delete(f"{OTP_RESEND_PREFIX}{phone}")
 
     result = await db.execute(select(User).where(User.phone == phone))
     user = result.scalar_one_or_none()

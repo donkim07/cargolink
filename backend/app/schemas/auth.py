@@ -51,3 +51,4 @@ class AuthResponse(TokenResponse):
 class MessageResponse(BaseModel):
     message: str
     expires_in: int | None = None
+    resend_available_in: int | None = None
