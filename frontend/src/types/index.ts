@@ -187,6 +187,7 @@ export interface ProviderDashboard {
     status: string
     total_cost: number
   }>
+  profile_setup_required?: boolean
 }
 
 export interface NotificationItem {

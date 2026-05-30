@@ -14,6 +14,7 @@ import {
   Container,
   Menu,
   X,
+  Shield,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { Badge } from '@/components/ui/badge'
@@ -23,34 +24,56 @@ import { NotificationsDropdown } from '@/components/shared/NotificationsDropdown
 import { cn } from '@/utils/cn'
 import type { UserRole } from '@/types'
 
-const navByRole: Record<UserRole, { to: string; label: string; icon: React.ElementType }[]> = {
-  customer: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/shipments/create', label: 'New Shipment', icon: PlusCircle },
-    { to: '/shipments', label: 'My Shipments', icon: Package },
-    { to: '/marketplace', label: 'Marketplace', icon: Store },
-    { to: '/shared-cargo', label: 'Shared Cargo', icon: Container },
-    { to: '/auctions', label: 'Auctions', icon: Gavel },
-    { to: '/payments', label: 'Payments', icon: CreditCard },
-  ],
-  provider: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/shipments', label: 'Available Jobs', icon: Package },
-    { to: '/fleet', label: 'My Fleet', icon: Truck },
-    { to: '/shared-cargo', label: 'Shared Cargo', icon: Container },
-    { to: '/auctions', label: 'Auctions', icon: Gavel },
-    { to: '/payments', label: 'Earnings', icon: CreditCard },
-  ],
-  driver: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/shipments', label: 'Deliveries', icon: Package },
-  ],
-  admin: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/admin/shipments', label: 'Shipments', icon: Package },
-    { to: '/admin/providers', label: 'Providers', icon: Users },
-    { to: '/admin/users', label: 'Users', icon: BarChart3 },
-  ],
+type NavItem = { to: string; label: string; icon: React.ElementType }
+
+const customerNav: NavItem[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/shipments/create', label: 'New Shipment', icon: PlusCircle },
+  { to: '/shipments', label: 'My Shipments', icon: Package },
+  { to: '/marketplace', label: 'Marketplace', icon: Store },
+  { to: '/shared-cargo', label: 'Shared Cargo', icon: Container },
+  { to: '/auctions', label: 'Auctions', icon: Gavel },
+  { to: '/payments', label: 'Payments', icon: CreditCard },
+]
+
+const providerNav: NavItem[] = [
+  { to: '/shipments', label: 'Available Jobs', icon: Package },
+  { to: '/fleet', label: 'My Fleet', icon: Truck },
+  { to: '/provider/register', label: 'Provider Setup', icon: Truck },
+  { to: '/shared-cargo', label: 'Shared Cargo', icon: Container },
+  { to: '/auctions', label: 'Auctions', icon: Gavel },
+  { to: '/payments', label: 'Earnings', icon: CreditCard },
+]
+
+const adminNav: NavItem[] = [
+  { to: '/admin/shipments', label: 'Manage Shipments', icon: Package },
+  { to: '/admin/providers', label: 'Manage Providers', icon: Users },
+  { to: '/admin/users', label: 'Manage Users', icon: BarChart3 },
+]
+
+function buildNav(role: UserRole): NavItem[] {
+  if (role === 'admin') {
+    const merged = new Map<string, NavItem>()
+    for (const item of [...customerNav, ...providerNav, ...adminNav]) {
+      merged.set(item.to, item)
+    }
+    merged.set('/dashboard', { to: '/dashboard', label: 'Admin Dashboard', icon: Shield })
+    return Array.from(merged.values())
+  }
+  if (role === 'provider') {
+    return [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      ...providerNav.filter((item) => item.to !== '/provider/register'),
+      { to: '/provider/register', label: 'Complete Profile', icon: Truck },
+    ]
+  }
+  if (role === 'driver') {
+    return [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/shipments', label: 'Deliveries', icon: Package },
+    ]
+  }
+  return customerNav
 }
 
 function SidebarContent({
@@ -59,7 +82,7 @@ function SidebarContent({
   onNavigate,
   onLogout,
 }: {
-  nav: { to: string; label: string; icon: React.ElementType }[]
+  nav: NavItem[]
   user: ReturnType<typeof useAuth>['user']
   onNavigate?: () => void
   onLogout: () => void
@@ -121,7 +144,7 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const nav = user ? navByRole[user.role] : []
+  const nav = user ? buildNav(user.role) : []
 
   const handleLogout = () => {
     logout()
@@ -130,12 +153,10 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <SidebarContent nav={nav} user={user} onLogout={handleLogout} />
       </aside>
 
-      {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <button

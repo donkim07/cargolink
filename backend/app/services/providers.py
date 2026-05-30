@@ -119,7 +119,16 @@ async def add_vehicle(
 
 
 async def get_provider_dashboard(current_user: User, db: AsyncSession) -> ProviderDashboard:
-    provider = await _get_provider_for_user(current_user, db)
+    provider = await get_provider_for_user(current_user, db)
+    if provider is None:
+        return ProviderDashboard(
+            pending_jobs=0,
+            active_deliveries=0,
+            monthly_earnings=Decimal("0"),
+            fleet_available=0,
+            recent_jobs=[],
+            profile_setup_required=True,
+        )
 
     pending_result = await db.execute(
         select(func.count(Booking.id)).where(

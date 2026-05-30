@@ -8,6 +8,7 @@ import { StatCard } from '@/components/shared/StatCard'
 import { DataTable } from '@/components/shared/DataTable'
 import { ShipmentStatusBadge } from '@/components/shared/ShipmentStatusBadge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { formatTZS } from '@/utils/cn'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { Shipment } from '@/types'
@@ -49,7 +50,6 @@ export default function DashboardPage() {
   const { data: shipments = [] } = useQuery({
     queryKey: ['shipments'],
     queryFn: () => shipmentsApi.list().then((r) => r.data),
-    enabled: !isAdmin,
   })
 
   const { data: dashboard } = useQuery({
@@ -73,9 +73,25 @@ export default function DashboardPage() {
   const active = shipments.filter((s) => ['booked', 'in_transit', 'quoted'].includes(s.status))
   const delivered = shipments.filter((s) => s.status === 'delivered')
   const displayShipments = isAdmin ? adminShipments : shipments
+  const needsProviderSetup = isProvider && dashboard?.profile_setup_required
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      {needsProviderSetup && (
+        <Card className="border-amber/30 bg-amber/5">
+          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">Complete your provider profile</p>
+              <p className="text-sm text-charcoal/60">
+                You signed up as a provider but have not registered your company yet.
+              </p>
+            </div>
+            <Button asChild>
+              <Link to="/provider/register">Register Company</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-charcoal">
@@ -84,9 +100,14 @@ export default function DashboardPage() {
           <p className="text-charcoal/60">Welcome back, {user?.full_name ?? user?.phone}</p>
         </div>
         {isAdmin && (
-          <Button variant="outline" onClick={() => adminApi.seedDemo()}>
-            Seed Demo Data
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/shipments/create"><PlusCircle className="h-4 w-4" /> New Shipment</Link>
+            </Button>
+            <Button variant="outline" onClick={() => adminApi.seedDemo()}>
+              Seed Demo Data
+            </Button>
+          </div>
         )}
         {!isProvider && !isAdmin && (
           <Button asChild size="lg">

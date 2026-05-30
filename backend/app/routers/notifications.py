@@ -13,6 +13,7 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
 @router.get("", response_model=list[NotificationResponse])
+@router.get("/", response_model=list[NotificationResponse], include_in_schema=False)
 async def list_notifications(
     unread_only: bool = Query(False),
     current_user: User = Depends(get_current_user),

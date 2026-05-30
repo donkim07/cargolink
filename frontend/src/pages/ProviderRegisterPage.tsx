@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { providersApi } from '@/services'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 export default function ProviderRegisterPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [companyName, setCompanyName] = useState('')
   const [registrationNumber, setRegistrationNumber] = useState('')
   const [description, setDescription] = useState('')
@@ -20,7 +21,11 @@ export default function ProviderRegisterPage() {
         registration_number: registrationNumber || undefined,
         description: description || undefined,
       }),
-    onSuccess: () => navigate('/fleet'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider-me'] })
+      queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] })
+      navigate('/fleet')
+    },
   })
 
   return (

@@ -61,3 +61,4 @@ class ProviderDashboard(BaseModel):
     monthly_earnings: Decimal
     fleet_available: int
     recent_jobs: list[dict] = []
+    profile_setup_required: bool = False

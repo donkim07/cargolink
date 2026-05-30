@@ -98,17 +98,20 @@ export default function AuctionsPage() {
   const [bidAmount, setBidAmount] = useState('')
   const [selectedAuction, setSelectedAuction] = useState<string | null>(null)
   const isProvider = user?.role === 'provider'
+  const isAdmin = user?.role === 'admin'
+  const canBid = isProvider || isAdmin
+  const canManageAuctions = user?.role === 'customer' || isAdmin
 
   const { data: browseAuctions = [] } = useQuery({
     queryKey: ['auctions', 'browse'],
     queryFn: () => auctionsApi.list().then((r) => r.data),
-    enabled: isProvider,
+    enabled: canBid,
   })
 
   const { data: myAuctions = [] } = useQuery({
     queryKey: ['auctions', 'mine'],
     queryFn: () => auctionsApi.list({ mine: true }).then((r) => r.data),
-    enabled: user?.role === 'customer' || user?.role === 'admin',
+    enabled: canManageAuctions,
   })
 
   const placeBid = useMutation({
@@ -133,13 +136,13 @@ export default function AuctionsPage() {
         <p className="text-charcoal/60">Bid on open freight listings or manage your auctions</p>
       </div>
 
-      <Tabs defaultValue={isProvider ? 'browse' : 'mine'}>
+      <Tabs defaultValue={canBid ? 'browse' : 'mine'}>
         <TabsList className="flex-wrap">
-          {isProvider && <TabsTrigger value="browse">Browse Auctions</TabsTrigger>}
-          {!isProvider && <TabsTrigger value="mine">My Auctions</TabsTrigger>}
+          {canBid && <TabsTrigger value="browse">Browse Auctions</TabsTrigger>}
+          {canManageAuctions && <TabsTrigger value="mine">My Auctions</TabsTrigger>}
         </TabsList>
 
-        {isProvider && (
+        {canBid && (
           <TabsContent value="browse" className="grid gap-4 sm:grid-cols-2">
             {browseAuctions.length === 0 ? (
               <p className="text-sm text-charcoal/50">No open auctions right now.</p>
@@ -156,7 +159,7 @@ export default function AuctionsPage() {
           </TabsContent>
         )}
 
-        {!isProvider && (
+        {canManageAuctions && (
           <TabsContent value="mine" className="grid gap-4 sm:grid-cols-2">
             {myAuctions.length === 0 ? (
               <p className="text-sm text-charcoal/50">Create an auction from a shipment quote to see it here.</p>

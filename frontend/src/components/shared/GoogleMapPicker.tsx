@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useGoogleMaps } from '@/hooks/useGoogleMaps'
+import { loadGoogleMaps } from '@/hooks/useGoogleMaps'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { LocationValue } from '@/components/shared/LocationInput'
@@ -25,11 +25,15 @@ export function GoogleMapPicker({
   const mapInstance = useRef<google.maps.Map | null>(null)
   const markerRef = useRef<google.maps.Marker | null>(null)
   const geocoderRef = useRef<google.maps.Geocoder | null>(null)
-  const { ready } = useGoogleMaps()
+  const [mapsReady, setMapsReady] = useState(false)
   const [picked, setPicked] = useState<LocationValue>({ address: '' })
 
   useEffect(() => {
-    if (!open || !ready || !mapRef.current) return
+    loadGoogleMaps().then(() => setMapsReady(true)).catch(() => setMapsReady(false))
+  }, [])
+
+  useEffect(() => {
+    if (!open || !mapsReady || !mapRef.current) return
 
     const map = new google.maps.Map(mapRef.current, {
       center: initialCenter,
@@ -79,7 +83,7 @@ export function GoogleMapPicker({
       marker.setMap(null)
       mapInstance.current = null
     }
-  }, [open, ready, initialCenter.lat, initialCenter.lng])
+  }, [open, mapsReady, initialCenter.lat, initialCenter.lng])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
