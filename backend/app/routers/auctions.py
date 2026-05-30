@@ -24,6 +24,9 @@ def _enrich_auction(auction) -> AuctionResponse:
     if auction.bids:
         response.lowest_bid = min(b.amount for b in auction.bids)
         response.bid_count = len(auction.bids)
+    if auction.shipment:
+        response.pickup_address = auction.shipment.pickup_address
+        response.destination_address = auction.shipment.destination_address
     return response
 
 
@@ -40,10 +43,13 @@ async def create_auction(
 @router.get("", response_model=list[AuctionResponse])
 async def list_auctions(
     status: AuctionStatus | None = Query(None),
+    mine: bool = Query(False),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    auctions = await auction_service.list_auctions(db, status)
+    customer_id = current_user.id if mine else None
+    open_only = not mine
+    auctions = await auction_service.list_auctions(db, status, customer_id, open_only)
     return [_enrich_auction(a) for a in auctions]
 
 

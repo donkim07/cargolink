@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -10,12 +11,15 @@ import {
   Users,
   BarChart3,
   LogOut,
-  Bell,
-  Search,
   Container,
+  Menu,
+  X,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { SearchBar } from '@/components/shared/SearchBar'
+import { NotificationsDropdown } from '@/components/shared/NotificationsDropdown'
 import { cn } from '@/utils/cn'
 import type { UserRole } from '@/types'
 
@@ -43,86 +47,138 @@ const navByRole: Record<UserRole, { to: string; label: string; icon: React.Eleme
   ],
   admin: [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/shipments', label: 'Shipments', icon: Package },
-    { to: '/marketplace', label: 'Providers', icon: Users },
-    { to: '/payments', label: 'Analytics', icon: BarChart3 },
+    { to: '/admin/shipments', label: 'Shipments', icon: Package },
+    { to: '/admin/providers', label: 'Providers', icon: Users },
+    { to: '/admin/users', label: 'Users', icon: BarChart3 },
   ],
+}
+
+function SidebarContent({
+  nav,
+  user,
+  onNavigate,
+  onLogout,
+}: {
+  nav: { to: string; label: string; icon: React.ElementType }[]
+  user: ReturnType<typeof useAuth>['user']
+  onNavigate?: () => void
+  onLogout: () => void
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber font-display text-lg font-bold text-white">
+          CL
+        </div>
+        <div>
+          <p className="font-display text-sm font-bold tracking-wide">CargoLink</p>
+          <p className="text-[10px] uppercase tracking-widest text-canvas/50">Africa</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {nav.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                isActive
+                  ? 'border-l-2 border-amber bg-amber/20 text-amber-light'
+                  : 'text-canvas/70 hover:bg-white/5 hover:text-canvas'
+              )
+            }
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="border-t border-white/10 p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-muted text-sm font-bold">
+            {user?.full_name?.charAt(0) ?? user?.phone.slice(-2)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{user?.full_name ?? user?.phone}</p>
+            <Badge variant="secondary" className="mt-0.5 border-0 bg-amber/20 text-[10px] capitalize text-amber-light">
+              {user?.role}
+            </Badge>
+          </div>
+          <button onClick={onLogout} className="text-canvas/50 hover:text-canvas" aria-label="Logout">
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </>
+  )
 }
 
 export function AppLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [mobileOpen, setMobileOpen] = useState(false)
   const nav = user ? navByRole[user.role] : []
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar — forest green conveys trust & stability */}
-      <aside className="flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
-        <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber font-display text-lg font-bold text-white">
-            CL
-          </div>
-          <div>
-            <p className="font-display text-sm font-bold tracking-wide">CargoLink</p>
-            <p className="text-[10px] uppercase tracking-widest text-canvas/50">Africa</p>
-          </div>
-        </div>
-
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {nav.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                  isActive
-                    ? 'bg-amber/20 text-amber-light border-l-2 border-amber'
-                    : 'text-canvas/70 hover:bg-white/5 hover:text-canvas'
-                )
-              }
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="border-t border-white/10 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-muted font-bold text-sm">
-              {user?.full_name?.charAt(0) ?? user?.phone.slice(-2)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium">{user?.full_name ?? user?.phone}</p>
-              <Badge variant="secondary" className="mt-0.5 capitalize text-[10px] bg-amber/20 text-amber-light border-0">
-                {user?.role}
-              </Badge>
-            </div>
-            <button onClick={() => { logout(); navigate('/login') }} className="text-canvas/50 hover:text-canvas">
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+      {/* Desktop sidebar */}
+      <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
+        <SidebarContent nav={nav} user={user} onLogout={handleLogout} />
       </aside>
 
-      {/* Main content — warm off-white canvas reduces eye strain */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-canvas">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-forest/10 bg-white/80 px-6 backdrop-blur-sm">
-          <div className="relative max-w-md flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal/30" />
-            <input
-              placeholder="Search shipments, providers..."
-              className="h-9 w-full rounded-lg border border-forest/10 bg-canvas/50 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-amber/30"
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+          />
+          <aside className="relative flex h-full w-72 max-w-[85vw] flex-col bg-sidebar text-sidebar-foreground shadow-xl">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 text-canvas"
+              onClick={() => setMobileOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <SidebarContent
+              nav={nav}
+              user={user}
+              onNavigate={() => setMobileOpen(false)}
+              onLogout={handleLogout}
             />
-          </div>
-          <button className="relative rounded-lg p-2 hover:bg-forest/5">
-            <Bell className="h-5 w-5 text-charcoal/60" />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber" />
-          </button>
+          </aside>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-forest/10 bg-white/80 px-4 backdrop-blur-sm sm:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 md:hidden"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <SearchBar />
+          <NotificationsDropdown />
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

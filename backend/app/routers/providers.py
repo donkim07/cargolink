@@ -30,6 +30,17 @@ async def list_providers(
     return [ProviderResponse.model_validate(p) for p in providers]
 
 
+@router.get("/me", response_model=ProviderResponse | None)
+async def get_my_provider(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    provider = await provider_service.get_provider_for_user(current_user, db)
+    if provider is None:
+        return None
+    return ProviderResponse.model_validate(provider)
+
+
 @router.get("/dashboard", response_model=ProviderDashboard)
 async def provider_dashboard(
     current_user: User = Depends(require_roles(UserRole.PROVIDER)),

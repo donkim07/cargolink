@@ -12,6 +12,10 @@ import AuctionsPage from '@/pages/AuctionsPage'
 import SharedCargoPage from '@/pages/SharedCargoPage'
 import PaymentsPage from '@/pages/PaymentsPage'
 import FleetPage from '@/pages/FleetPage'
+import ProviderRegisterPage from '@/pages/ProviderRegisterPage'
+import AdminProvidersPage from '@/pages/admin/AdminProvidersPage'
+import AdminShipmentsPage from '@/pages/admin/AdminShipmentsPage'
+import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +40,10 @@ export const router = createBrowserRouter([
           { path: '/shared-cargo', element: <SharedCargoPage /> },
           { path: '/payments', element: <PaymentsPage /> },
           { path: '/fleet', element: <FleetPage /> },
+          { path: '/provider/register', element: <ProviderRegisterPage /> },
+          { path: '/admin/providers', element: <AdminProvidersPage /> },
+          { path: '/admin/shipments', element: <AdminShipmentsPage /> },
+          { path: '/admin/users', element: <AdminUsersPage /> },
         ],
       },
     ],

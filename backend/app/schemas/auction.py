@@ -42,6 +42,8 @@ class AuctionResponse(BaseModel):
     bids: list[AuctionBidResponse] = []
     lowest_bid: Decimal | None = None
     bid_count: int = 0
+    pickup_address: str | None = None
+    destination_address: str | None = None
 
 
 class SelectWinnerRequest(BaseModel):

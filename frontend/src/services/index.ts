@@ -1,8 +1,12 @@
 import { api } from './api'
 import type {
+  AdminAnalytics,
+  AdminProvider,
+  AdminUser,
   AuthResponse,
   Auction,
   AuctionBid,
+  NotificationItem,
   Payment,
   Provider,
   ProviderDashboard,
@@ -44,6 +48,7 @@ export const providersApi = {
   list: (params?: { vehicle_type?: string; min_rating?: number }) =>
     api.get<Provider[]>('/providers', { params }),
   get: (id: string) => api.get<Provider>(`/providers/${id}`),
+  me: () => api.get<Provider | null>('/providers/me'),
   register: (data: Record<string, unknown>) => api.post<Provider>('/providers/register', data),
   dashboard: () => api.get<ProviderDashboard>('/providers/dashboard'),
   addVehicle: (data: Record<string, unknown>) => api.post<Vehicle>('/providers/vehicles', data),
@@ -51,8 +56,31 @@ export const providersApi = {
     api.post(`/providers/book/${shipmentId}/${providerId}/${vehicleId}`),
 }
 
+export const notificationsApi = {
+  list: (unreadOnly = false) =>
+    api.get<NotificationItem[]>('/notifications', { params: { unread_only: unreadOnly } }),
+  markRead: (id: string) => api.post<NotificationItem>(`/notifications/${id}/read`),
+  markAllRead: () => api.post<{ marked_read: number }>('/notifications/read-all'),
+}
+
+export const searchApi = {
+  search: (q: string) => api.get<{ shipments: Shipment[]; providers: Provider[] }>('/search', { params: { q } }),
+}
+
+export const adminApi = {
+  analytics: () => api.get<AdminAnalytics>('/admin/analytics'),
+  listUsers: () => api.get<AdminUser[]>('/admin/users'),
+  listProviders: (approved?: boolean) =>
+    api.get<AdminProvider[]>('/admin/providers', { params: approved !== undefined ? { approved } : {} }),
+  approveProvider: (id: string) => api.post<AdminProvider>(`/admin/providers/${id}/approve`),
+  listShipments: () => api.get<Shipment[]>('/admin/shipments'),
+  assignShipment: (shipmentId: string, providerId: string, vehicleId: string) =>
+    api.post(`/admin/shipments/${shipmentId}/assign`, { provider_id: providerId, vehicle_id: vehicleId }),
+  seedDemo: () => api.post('/admin/seed-demo'),
+}
+
 export const auctionsApi = {
-  list: () => api.get<Auction[]>('/auctions'),
+  list: (params?: { mine?: boolean }) => api.get<Auction[]>('/auctions', { params }),
   create: (shipment_id: string, duration_hours = 24) =>
     api.post<Auction>('/auctions', { shipment_id, duration_hours }),
   bid: (id: string, amount: number, notes?: string) =>

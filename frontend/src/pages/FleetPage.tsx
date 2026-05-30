@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Truck, PlusCircle } from 'lucide-react'
 import { providersApi } from '@/services'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,11 @@ export default function FleetPage() {
   const [plate, setPlate] = useState('')
   const [capacity, setCapacity] = useState('')
 
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['provider-me'],
+    queryFn: () => providersApi.me().then((r) => r.data),
+  })
+
   const addVehicle = useMutation({
     mutationFn: () =>
       providersApi.addVehicle({
@@ -26,6 +32,7 @@ export default function FleetPage() {
         capacity_tons: parseFloat(capacity),
       }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider-me'] })
       queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] })
       setOpen(false)
       setPlate('')
@@ -33,12 +40,25 @@ export default function FleetPage() {
     },
   })
 
+  if (isLoading) return <p>Loading...</p>
+
+  if (!profile) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 text-center">
+        <Truck className="mx-auto h-12 w-12 text-charcoal/30" />
+        <h1 className="font-display text-2xl font-bold">Set Up Your Fleet</h1>
+        <p className="text-charcoal/60">Register as a provider before adding vehicles.</p>
+        <Button asChild><Link to="/provider/register">Register as Provider</Link></Button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">My Fleet</h1>
-          <p className="text-charcoal/60">Manage your vehicles</p>
+          <p className="text-charcoal/60">{profile.company_name} — {profile.vehicles.length} vehicles</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -77,13 +97,33 @@ export default function FleetPage() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardContent className="p-8 text-center text-charcoal/40">
-          <Truck className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p>Add vehicles to start accepting jobs</p>
-          <Badge variant="success" className="mt-3">Available</Badge>
-        </CardContent>
-      </Card>
+      {profile.vehicles.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center text-charcoal/40">
+            <Truck className="mx-auto mb-3 h-12 w-12 opacity-30" />
+            <p>Add vehicles to start accepting jobs</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {profile.vehicles.map((v) => (
+            <Card key={v.id}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-display font-bold">{v.plate_number}</p>
+                    <p className="text-sm capitalize text-charcoal/50">{v.type.replace('_', ' ')}</p>
+                  </div>
+                  <Badge variant={v.is_available ? 'success' : 'secondary'}>
+                    {v.is_available ? 'Available' : 'Busy'}
+                  </Badge>
+                </div>
+                <p className="mt-3 text-sm text-charcoal/60">{v.capacity_tons} tons capacity</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

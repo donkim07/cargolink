@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Package, DollarSign, CheckCircle, Clock, Truck, PlusCircle } from 'lucide-react'
+import { Package, DollarSign, CheckCircle, Clock, Truck, PlusCircle, Users, BarChart3 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import { shipmentsApi, providersApi } from '@/services'
+import { shipmentsApi, providersApi, adminApi } from '@/services'
 import { StatCard } from '@/components/shared/StatCard'
 import { DataTable } from '@/components/shared/DataTable'
 import { ShipmentStatusBadge } from '@/components/shared/ShipmentStatusBadge'
@@ -44,10 +44,12 @@ const shipmentColumns: ColumnDef<Shipment>[] = [
 export default function DashboardPage() {
   const { user } = useAuth()
   const isProvider = user?.role === 'provider'
+  const isAdmin = user?.role === 'admin'
 
   const { data: shipments = [] } = useQuery({
     queryKey: ['shipments'],
     queryFn: () => shipmentsApi.list().then((r) => r.data),
+    enabled: !isAdmin,
   })
 
   const { data: dashboard } = useQuery({
@@ -56,19 +58,37 @@ export default function DashboardPage() {
     enabled: isProvider,
   })
 
+  const { data: analytics } = useQuery({
+    queryKey: ['admin-analytics'],
+    queryFn: () => adminApi.analytics().then((r) => r.data),
+    enabled: isAdmin,
+  })
+
+  const { data: adminShipments = [] } = useQuery({
+    queryKey: ['admin-shipments'],
+    queryFn: () => adminApi.listShipments().then((r) => r.data),
+    enabled: isAdmin,
+  })
+
   const active = shipments.filter((s) => ['booked', 'in_transit', 'quoted'].includes(s.status))
   const delivered = shipments.filter((s) => s.status === 'delivered')
+  const displayShipments = isAdmin ? adminShipments : shipments
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-charcoal">
-            {isProvider ? 'Provider Dashboard' : 'Dashboard'}
+            {isAdmin ? 'Admin Dashboard' : isProvider ? 'Provider Dashboard' : 'Dashboard'}
           </h1>
           <p className="text-charcoal/60">Welcome back, {user?.full_name ?? user?.phone}</p>
         </div>
-        {!isProvider && (
+        {isAdmin && (
+          <Button variant="outline" onClick={() => adminApi.seedDemo()}>
+            Seed Demo Data
+          </Button>
+        )}
+        {!isProvider && !isAdmin && (
           <Button asChild size="lg">
             <Link to="/shipments/create"><PlusCircle className="h-4 w-4" /> Book New Shipment</Link>
           </Button>
@@ -81,7 +101,14 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isProvider ? (
+        {isAdmin ? (
+          <>
+            <StatCard title="Total Users" value={analytics?.total_users ?? 0} icon={<Users className="h-5 w-5" />} />
+            <StatCard title="Providers" value={analytics?.total_providers ?? 0} icon={<Truck className="h-5 w-5" />} />
+            <StatCard title="Shipments" value={analytics?.total_shipments ?? 0} icon={<Package className="h-5 w-5" />} />
+            <StatCard title="Revenue" value={formatTZS(analytics?.total_revenue ?? 0)} icon={<BarChart3 className="h-5 w-5" />} />
+          </>
+        ) : isProvider ? (
           <>
             <StatCard title="Pending Jobs" value={dashboard?.pending_jobs ?? 0} icon={<Clock className="h-5 w-5" />} />
             <StatCard title="Active Deliveries" value={dashboard?.active_deliveries ?? 0} icon={<Truck className="h-5 w-5" />} />
@@ -100,7 +127,7 @@ export default function DashboardPage() {
 
       <div>
         <h2 className="font-display text-lg font-bold mb-3">Recent Shipments</h2>
-        <DataTable columns={shipmentColumns} data={shipments.slice(0, 8)} />
+        <DataTable columns={shipmentColumns} data={displayShipments.slice(0, 8)} />
       </div>
     </motion.div>
   )

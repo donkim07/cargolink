@@ -132,6 +132,8 @@ export interface Auction {
   bids?: AuctionBid[]
   lowest_bid?: number | null
   bid_count?: number
+  pickup_address?: string | null
+  destination_address?: string | null
 }
 
 export interface AuctionBid {
@@ -185,4 +187,44 @@ export interface ProviderDashboard {
     status: string
     total_cost: number
   }>
+}
+
+export interface NotificationItem {
+  id: string
+  type: string
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface AdminAnalytics {
+  total_users: number
+  total_providers: number
+  total_shipments: number
+  active_shipments: number
+  total_revenue: number
+}
+
+export interface AdminProvider {
+  id: string
+  user_id: string
+  company_name: string
+  is_approved: boolean
+  rating: number
+  total_deliveries: number
+  created_at: string
+  user_phone: string | null
+  vehicles?: Vehicle[]
+}
+
+export interface AdminUser {
+  id: string
+  phone: string
+  full_name: string | null
+  email: string | null
+  role: UserRole
+  is_verified: boolean
+  is_active: boolean
+  created_at: string
 }

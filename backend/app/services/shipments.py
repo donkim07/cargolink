@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.enums import ShipmentStatus, UserRole, VehicleType
+from app.models.enums import NotificationType, ShipmentStatus, UserRole, VehicleType
+from app.models.notification import Notification
 from app.models.provider import Provider
 from app.models.shipment import Shipment
 from app.models.user import User
@@ -63,6 +64,16 @@ async def create_shipment(
         status=ShipmentStatus.PENDING,
     )
     db.add(shipment)
+    await db.flush()
+
+    db.add(
+        Notification(
+            user_id=current_user.id,
+            type=NotificationType.SYSTEM,
+            title="Shipment Created",
+            message=f"Your shipment from {data.pickup_address} to {data.destination_address} is ready for quotes.",
+        )
+    )
     await db.flush()
     return shipment
 
@@ -134,14 +145,29 @@ async def generate_quotes(shipment_id: UUID, current_user: User, db: AsyncSessio
     weight = float(shipment.weight_tons)
     volume = float(shipment.volume_m3 or 0)
 
+    recommended_type = VehicleType(recommended)
+
     for provider in providers:
-        available_vehicles = [v for v in provider.vehicles if v.is_available]
+        available_vehicles = [
+            v
+            for v in provider.vehicles
+            if v.is_available and float(v.capacity_tons or 0) >= weight
+        ]
         if not available_vehicles:
             continue
 
-        vehicle_types = {v.type for v in available_vehicles}
-        best_type = recommended if VehicleType(recommended) in vehicle_types else available_vehicles[0].type.value
-        vehicle = next((v for v in available_vehicles if v.type.value == best_type), available_vehicles[0])
+        if shipment.requires_refrigeration:
+            refrigerated = [v for v in available_vehicles if v.type == VehicleType.REFRIGERATED_TRUCK]
+            if refrigerated:
+                vehicle = refrigerated[0]
+            elif recommended_type in {v.type for v in available_vehicles}:
+                vehicle = next(v for v in available_vehicles if v.type == recommended_type)
+            else:
+                vehicle = max(available_vehicles, key=lambda v: float(v.capacity_tons or 0))
+        elif recommended_type in {v.type for v in available_vehicles}:
+            vehicle = next(v for v in available_vehicles if v.type == recommended_type)
+        else:
+            vehicle = min(available_vehicles, key=lambda v: float(v.capacity_tons or 0))
 
         pricing = calculate_cost(
             distance_km=distance,

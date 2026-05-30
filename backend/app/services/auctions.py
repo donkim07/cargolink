@@ -45,18 +45,25 @@ async def create_auction(data: AuctionCreate, current_user: User, db: AsyncSessi
     return auction
 
 
-async def list_auctions(db: AsyncSession, status_filter: AuctionStatus | None = None) -> list[Auction]:
+async def list_auctions(
+    db: AsyncSession,
+    status_filter: AuctionStatus | None = None,
+    customer_id: UUID | None = None,
+    open_only: bool = True,
+) -> list[Auction]:
     query = select(Auction).options(
         selectinload(Auction.bids),
         selectinload(Auction.shipment),
     )
+    if customer_id:
+        query = query.join(Shipment).where(Shipment.customer_id == customer_id)
+    elif open_only:
+        query = query.where(Auction.status == AuctionStatus.OPEN)
     if status_filter:
         query = query.where(Auction.status == status_filter)
-    else:
-        query = query.where(Auction.status == AuctionStatus.OPEN)
 
     result = await db.execute(query.order_by(Auction.ends_at.asc()))
-    return list(result.scalars().all())
+    return list(result.scalars().unique().all())
 
 
 async def place_bid(

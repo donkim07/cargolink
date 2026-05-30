@@ -7,8 +7,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.models.booking import Booking
-from app.models.enums import BookingStatus, ShipmentStatus, UserRole
+from app.models.enums import BookingStatus, NotificationType, ShipmentStatus, UserRole
+from app.models.notification import Notification
 from app.models.provider import Provider
 from app.models.user import User
 from app.models.vehicle import Vehicle
@@ -68,8 +70,23 @@ async def register_provider(
         registration_number=data.registration_number,
         description=data.description,
         logo_url=data.logo_url,
+        is_approved=settings.debug,
     )
     db.add(provider)
+    await db.flush()
+
+    db.add(
+        Notification(
+            user_id=current_user.id,
+            type=NotificationType.SYSTEM,
+            title="Provider Registration",
+            message=(
+                "Your provider profile is approved and live."
+                if provider.is_approved
+                else "Your provider profile is pending admin approval."
+            ),
+        )
+    )
     await db.flush()
     return provider
 
@@ -200,13 +217,34 @@ async def book_with_provider(
     )
     shipment.status = ShipmentStatus.BOOKED
     db.add(booking)
+
+    customer_result = await db.execute(select(User).where(User.id == shipment.customer_id))
+    customer = customer_result.scalar_one_or_none()
+    if customer:
+        db.add(
+            Notification(
+                user_id=customer.id,
+                type=NotificationType.BOOKING_UPDATE,
+                title="Booking Confirmed",
+                message=f"Provider {provider.company_name} assigned. Tracking: {tracking_code}",
+            )
+        )
+
     await db.flush()
     return booking
 
 
+async def get_provider_for_user(current_user: User, db: AsyncSession) -> Provider | None:
+    result = await db.execute(
+        select(Provider)
+        .options(selectinload(Provider.vehicles))
+        .where(Provider.user_id == current_user.id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def _get_provider_for_user(current_user: User, db: AsyncSession) -> Provider:
-    result = await db.execute(select(Provider).where(Provider.user_id == current_user.id))
-    provider = result.scalar_one_or_none()
+    provider = await get_provider_for_user(current_user, db)
     if provider is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider profile not found")
     return provider
