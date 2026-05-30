@@ -12,6 +12,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
     VerifyOTPRequest,
+    UserProfileUpdate,
 )
 from app.services import auth as auth_service
 
@@ -64,3 +65,13 @@ async def refresh_token(
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_me(
+    data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await auth_service.update_profile(current_user, data.model_dump(exclude_unset=True), db)
+    return UserResponse.model_validate(user)

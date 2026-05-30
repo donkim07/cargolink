@@ -37,6 +37,8 @@ export const authApi = {
   }) => api.post<AuthResponse>('/auth/verify-otp', payload),
 
   me: () => api.get<User>('/auth/me'),
+  updateProfile: (data: { full_name?: string; email?: string; profile_photo?: string | null }) =>
+    api.patch<User>('/auth/me', data),
 }
 
 export const shipmentsApi = {

@@ -22,6 +22,7 @@ export default function FleetPage() {
   const [driverPhone, setDriverPhone] = useState('')
   const [driverName, setDriverName] = useState('')
   const [driverLicense, setDriverLicense] = useState('')
+  const [driverError, setDriverError] = useState<string | null>(null)
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['provider-me'],
@@ -63,6 +64,10 @@ export default function FleetPage() {
       setDriverPhone('')
       setDriverName('')
       setDriverLicense('')
+      setDriverError(null)
+    },
+    onError: (err: Error & { response?: { data?: { detail?: string } } }) => {
+      setDriverError(err.response?.data?.detail ?? 'Could not add driver')
     },
   })
 
@@ -95,11 +100,14 @@ export default function FleetPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Driver</DialogTitle></DialogHeader>
-            <p className="text-sm text-charcoal/60">The driver must already have a CargoLink account (register with their phone first).</p>
+            <p className="text-sm text-charcoal/60">
+              The driver must register on CargoLink first (phone + OTP). Use format <strong>+255712345678</strong> or <strong>0712345678</strong>.
+            </p>
+            {driverError && <p className="text-sm text-red-600">{driverError}</p>}
             <div className="space-y-4">
               <div>
                 <Label>Driver Phone</Label>
-                <Input value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} placeholder="+255..." className="mt-1.5" />
+                <Input value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} placeholder="+255712345678" className="mt-1.5" />
               </div>
               <div>
                 <Label>Full Name</Label>

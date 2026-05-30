@@ -8,6 +8,17 @@ from app.models.booking import Booking
 from app.models.driver import Driver
 
 
+def normalize_tz_phone(phone: str) -> str:
+    cleaned = phone.strip().replace(" ", "").replace("-", "")
+    if cleaned.startswith("0") and len(cleaned) == 10:
+        cleaned = "+255" + cleaned[1:]
+    elif cleaned.startswith("255") and not cleaned.startswith("+"):
+        cleaned = "+" + cleaned
+    elif not cleaned.startswith("+") and cleaned.isdigit():
+        cleaned = "+255" + cleaned
+    return cleaned
+
+
 class DriverCreate(BaseModel):
     phone: str = Field(..., min_length=9, max_length=20)
     license_number: str = Field(..., max_length=50)

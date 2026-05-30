@@ -172,3 +172,21 @@ async def refresh_access_token(refresh_token: str, db: AsyncSession) -> dict:
         "refresh_token": new_refresh_token,
         "token_type": "bearer",
     }
+
+
+async def update_profile(current_user: User, data: dict, db: AsyncSession) -> User:
+    if "full_name" in data and data["full_name"] is not None:
+        current_user.full_name = data["full_name"].strip() or None
+    if "email" in data:
+        current_user.email = str(data["email"]) if data["email"] else None
+    if "profile_photo" in data:
+        photo = data["profile_photo"]
+        if photo and len(photo) > 500_000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Profile photo too large (max ~500KB)",
+            )
+        current_user.profile_photo = photo or None
+    await db.flush()
+    await db.refresh(current_user)
+    return current_user

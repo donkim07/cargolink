@@ -52,3 +52,9 @@ class MessageResponse(BaseModel):
     message: str
     expires_in: int | None = None
     resend_available_in: int | None = None
+
+
+class UserProfileUpdate(BaseModel):
+    full_name: str | None = Field(None, max_length=100)
+    email: EmailStr | None = None
+    profile_photo: str | None = Field(None, max_length=600_000)

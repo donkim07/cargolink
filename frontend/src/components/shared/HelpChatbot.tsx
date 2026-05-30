@@ -127,7 +127,7 @@ export function HelpChatbot() {
   }
 
   return (
-    <>
+    <div className="notranslate">
       <Button
         type="button"
         size="icon"
@@ -187,6 +187,6 @@ export function HelpChatbot() {
           </form>
         </div>
       )}
-    </>
+    </div>
   )
 }

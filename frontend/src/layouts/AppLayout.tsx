@@ -124,8 +124,12 @@ function SidebarContent({
 
       <div className="border-t border-white/10 p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-muted text-sm font-bold">
-            {user?.full_name?.charAt(0) ?? user?.phone.slice(-2)}
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-muted text-sm font-bold">
+            {user?.profile_photo ? (
+              <img src={user.profile_photo} alt="" className="h-full w-full object-cover" />
+            ) : (
+              user?.full_name?.charAt(0) ?? user?.phone.slice(-2)
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{user?.full_name ?? user?.phone}</p>
@@ -155,7 +159,7 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
+      <aside className="notranslate hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
         <SidebarContent nav={nav} user={user} onLogout={handleLogout} />
       </aside>
 
@@ -167,7 +171,7 @@ export function AppLayout() {
             onClick={() => setMobileOpen(false)}
             aria-label="Close menu"
           />
-          <aside className="relative flex h-full w-72 max-w-[85vw] flex-col bg-sidebar text-sidebar-foreground shadow-xl">
+          <aside className="notranslate relative flex h-full w-72 max-w-[85vw] flex-col bg-sidebar text-sidebar-foreground shadow-xl">
             <Button
               variant="ghost"
               size="icon"
@@ -187,7 +191,7 @@ export function AppLayout() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-canvas">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-forest/10 bg-white/80 px-4 backdrop-blur-sm sm:px-6">
+        <header className="notranslate flex h-14 shrink-0 items-center gap-3 border-b border-forest/10 bg-white/80 px-4 backdrop-blur-sm sm:px-6">
           <Button
             variant="ghost"
             size="icon"

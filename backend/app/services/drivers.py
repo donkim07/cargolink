@@ -42,6 +42,12 @@ async def register_driver(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already a driver")
 
+    if user.role in (UserRole.PROVIDER, UserRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with role '{user.role.value}' cannot be added as a driver",
+        )
+
     user.role = UserRole.DRIVER
     driver = Driver(
         provider_id=provider.id,
@@ -51,6 +57,16 @@ async def register_driver(
     )
     db.add(driver)
     await db.flush()
+    return await get_driver_with_user(driver.id, db)
+
+
+async def get_driver_with_user(driver_id: UUID, db: AsyncSession) -> Driver:
+    result = await db.execute(
+        select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
+    )
+    driver = result.scalar_one_or_none()
+    if driver is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
     return driver
 
 
@@ -62,28 +78,35 @@ async def add_driver_to_provider(
     current_user: User,
     db: AsyncSession,
 ) -> Driver:
-    provider = await db.execute(
+    from app.schemas.driver import normalize_tz_phone
+
+    normalized_phone = normalize_tz_phone(phone)
+
+    provider_result = await db.execute(
         select(Provider).where(Provider.user_id == current_user.id)
     )
-    provider_obj = provider.scalar_one_or_none()
+    provider_obj = provider_result.scalar_one_or_none()
     if provider_obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider profile not found")
 
-    user_result = await db.execute(select(User).where(User.phone == phone))
+    user_result = await db.execute(select(User).where(User.phone == normalized_phone))
     user = user_result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User must register on CargoLink first, then you can add them as a driver",
+            detail=(
+                f"No account found for {normalized_phone}. "
+                "Ask them to register on CargoLink first (Register → enter phone → OTP)."
+            ),
         )
 
-    if full_name and not user.full_name:
+    if full_name:
         user.full_name = full_name
 
     return await register_driver(
         provider=provider_obj,
         user=user,
-        license_number=license_number,
+        license_number=license_number.strip(),
         db=db,
     )
 
