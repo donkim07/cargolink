@@ -51,24 +51,32 @@ async def provider_dashboard(
     return await provider_service.get_provider_dashboard(current_user, db)
 
 
-@router.get("/{provider_id}/drivers", response_model=list[DriverResponse])
-async def list_provider_drivers(
-    provider_id: UUID,
+@router.get("/drivers", response_model=list[DriverResponse])
+async def list_my_drivers(
+    current_user: User = Depends(require_roles(UserRole.PROVIDER)),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
 ):
-    drivers = await driver_service.list_provider_drivers(provider_id, db)
+    provider = await provider_service.get_provider_for_user(current_user, db)
+    if provider is None:
+        return []
+    drivers = await driver_service.list_provider_drivers(provider.id, db)
     return [DriverResponse.from_model(d) for d in drivers]
 
 
-@router.get("/{provider_id}", response_model=ProviderResponse)
-async def get_provider(
-    provider_id: UUID,
+@router.post("/drivers", response_model=DriverResponse, status_code=201)
+async def add_driver(
+    data: DriverCreate,
+    current_user: User = Depends(require_roles(UserRole.PROVIDER)),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
 ):
-    provider = await provider_service.get_provider(provider_id, db)
-    return ProviderResponse.model_validate(provider)
+    driver = await driver_service.add_driver_to_provider(
+        phone=data.phone,
+        license_number=data.license_number,
+        full_name=data.full_name,
+        current_user=current_user,
+        db=db,
+    )
+    return DriverResponse.from_model(driver)
 
 
 @router.post("/register", response_model=ProviderResponse, status_code=201)
@@ -91,34 +99,6 @@ async def add_vehicle(
     return VehicleResponse.model_validate(vehicle)
 
 
-@router.post("/drivers", response_model=DriverResponse, status_code=201)
-async def add_driver(
-    data: DriverCreate,
-    current_user: User = Depends(require_roles(UserRole.PROVIDER)),
-    db: AsyncSession = Depends(get_db),
-):
-    driver = await driver_service.add_driver_to_provider(
-        phone=data.phone,
-        license_number=data.license_number,
-        full_name=data.full_name,
-        current_user=current_user,
-        db=db,
-    )
-    return DriverResponse.from_model(driver)
-
-
-@router.get("/drivers", response_model=list[DriverResponse])
-async def list_my_drivers(
-    current_user: User = Depends(require_roles(UserRole.PROVIDER)),
-    db: AsyncSession = Depends(get_db),
-):
-    provider = await provider_service.get_provider_for_user(current_user, db)
-    if provider is None:
-        return []
-    drivers = await driver_service.list_provider_drivers(provider.id, db)
-    return [DriverResponse.from_model(d) for d in drivers]
-
-
 @router.post("/book/{shipment_id}/{provider_id}/{vehicle_id}")
 async def book_provider(
     shipment_id: UUID,
@@ -136,3 +116,23 @@ async def book_provider(
         "total_cost": float(booking.total_cost),
         "status": booking.status.value,
     }
+
+
+@router.get("/{provider_id}/drivers", response_model=list[DriverResponse])
+async def list_provider_drivers(
+    provider_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    drivers = await driver_service.list_provider_drivers(provider_id, db)
+    return [DriverResponse.from_model(d) for d in drivers]
+
+
+@router.get("/{provider_id}", response_model=ProviderResponse)
+async def get_provider(
+    provider_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    provider = await provider_service.get_provider(provider_id, db)
+    return ProviderResponse.model_validate(provider)

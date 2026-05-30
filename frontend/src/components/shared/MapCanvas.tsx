@@ -14,6 +14,7 @@ export interface MapCanvasProps {
   zoom?: number
   markers?: MapMarker[]
   path?: Array<{ lat: number; lng: number }>
+  fitPath?: boolean
   className?: string
   interactive?: boolean
   onClick?: (lat: number, lng: number) => void
@@ -31,6 +32,7 @@ export function MapCanvas({
   zoom = 10,
   markers = [],
   path,
+  fitPath = false,
   className,
   interactive = true,
   onClick,
@@ -146,8 +148,15 @@ export function MapCanvas({
         strokeOpacity: 0.9,
         strokeWeight: 4,
       })
+
+      if (fitPath) {
+        const bounds = new google.maps.LatLngBounds()
+        points.forEach((p) => bounds.extend(p))
+        JSON.parse(markersKey).forEach((marker: MapMarker) => bounds.extend(marker))
+        mapRef.current.fitBounds(bounds, 48)
+      }
     }
-  }, [pathKey, mapReady])
+  }, [pathKey, mapReady, fitPath, markersKey])
 
   return (
     <div
