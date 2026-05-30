@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Shield,
+  MapPinned,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +31,7 @@ const customerNav: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/shipments/create', label: 'New Shipment', icon: PlusCircle },
   { to: '/shipments', label: 'My Shipments', icon: Package },
+  { to: '/track', label: 'Track Cargo', icon: MapPinned },
   { to: '/marketplace', label: 'Marketplace', icon: Store },
   { to: '/shared-cargo', label: 'Shared Cargo', icon: Container },
   { to: '/auctions', label: 'Auctions', icon: Gavel },
@@ -37,33 +39,30 @@ const customerNav: NavItem[] = [
 ]
 
 const providerNav: NavItem[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/shipments', label: 'Available Jobs', icon: Package },
+  { to: '/track', label: 'Track Cargo', icon: MapPinned },
   { to: '/fleet', label: 'My Fleet', icon: Truck },
-  { to: '/provider/register', label: 'Provider Setup', icon: Truck },
   { to: '/shared-cargo', label: 'Shared Cargo', icon: Container },
   { to: '/auctions', label: 'Auctions', icon: Gavel },
   { to: '/payments', label: 'Earnings', icon: CreditCard },
 ]
 
 const adminNav: NavItem[] = [
+  { to: '/dashboard', label: 'Admin Dashboard', icon: Shield },
   { to: '/admin/shipments', label: 'Manage Shipments', icon: Package },
   { to: '/admin/providers', label: 'Manage Providers', icon: Users },
   { to: '/admin/users', label: 'Manage Users', icon: BarChart3 },
+  { to: '/track', label: 'Track Cargo', icon: MapPinned },
+  { to: '/shipments/create', label: 'New Shipment', icon: PlusCircle },
+  { to: '/marketplace', label: 'Marketplace', icon: Store },
 ]
 
 function buildNav(role: UserRole): NavItem[] {
-  if (role === 'admin') {
-    const merged = new Map<string, NavItem>()
-    for (const item of [...customerNav, ...providerNav, ...adminNav]) {
-      merged.set(item.to, item)
-    }
-    merged.set('/dashboard', { to: '/dashboard', label: 'Admin Dashboard', icon: Shield })
-    return Array.from(merged.values())
-  }
+  if (role === 'admin') return adminNav
   if (role === 'provider') {
     return [
-      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      ...providerNav.filter((item) => item.to !== '/provider/register'),
+      ...providerNav,
       { to: '/provider/register', label: 'Complete Profile', icon: Truck },
     ]
   }
@@ -71,6 +70,7 @@ function buildNav(role: UserRole): NavItem[] {
     return [
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/shipments', label: 'Deliveries', icon: Package },
+      { to: '/track', label: 'Track Cargo', icon: MapPinned },
     ]
   }
   return customerNav

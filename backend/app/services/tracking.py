@@ -38,6 +38,36 @@ def _checkpoint_key(booking_id: UUID) -> str:
     return f"booking:checkpoint:{booking_id}"
 
 
+def _location_key(booking_id: UUID) -> str:
+    return f"booking:location:{booking_id}"
+
+
+async def _resolve_current_coords(
+    booking: Booking, shipment: Shipment | None, redis
+) -> tuple[float | None, float | None]:
+    raw = await redis.get(_location_key(booking.id))
+    if raw and "," in raw:
+        lat, lng = raw.split(",", 1)
+        return float(lat), float(lng)
+
+    if shipment is None:
+        return None, None
+
+    pickup_lat = float(shipment.pickup_lat) if shipment.pickup_lat is not None else None
+    pickup_lng = float(shipment.pickup_lng) if shipment.pickup_lng is not None else None
+    dest_lat = float(shipment.destination_lat) if shipment.destination_lat is not None else None
+    dest_lng = float(shipment.destination_lng) if shipment.destination_lng is not None else None
+
+    if booking.status == BookingStatus.DELIVERED and dest_lat is not None and dest_lng is not None:
+        return dest_lat, dest_lng
+    if booking.status in (BookingStatus.IN_TRANSIT, BookingStatus.CONFIRMED):
+        if pickup_lat is not None and dest_lat is not None and pickup_lng is not None and dest_lng is not None:
+            return (pickup_lat + dest_lat) / 2, (pickup_lng + dest_lng) / 2
+    if pickup_lat is not None and pickup_lng is not None:
+        return pickup_lat, pickup_lng
+    return None, None
+
+
 async def generate_delivery_otp(booking_id: UUID) -> str:
     otp = f"{secrets.randbelow(9000) + 1000:04d}"
     redis = await get_redis()
@@ -238,6 +268,18 @@ async def update_checkpoint(
     redis = await get_redis()
     await redis.set(_checkpoint_key(booking.id), region, ex=60 * 60 * 48)
 
+    from app.services.maps import geocode_address
+
+    try:
+        geo = await geocode_address(region)
+        await redis.set(
+            _location_key(booking.id),
+            f"{geo['lat']},{geo['lng']}",
+            ex=60 * 60 * 48,
+        )
+    except Exception:
+        pass
+
     if customer:
         await send_region_checkpoint(
             customer.phone, booking.tracking_code, region, settings.ussd_code, db
@@ -274,6 +316,7 @@ async def get_tracking_info(tracking_code: str, db: AsyncSession) -> dict:
         shipment.destination_address if shipment else None,
     )
     community = await get_community_risks(redis, route_label)
+    current_lat, current_lng = await _resolve_current_coords(booking, shipment, redis)
 
     return {
         "tracking_code": booking.tracking_code,
@@ -281,6 +324,12 @@ async def get_tracking_info(tracking_code: str, db: AsyncSession) -> dict:
         "shipment_status": shipment.status.value if shipment else None,
         "pickup": shipment.pickup_address if shipment else None,
         "destination": shipment.destination_address if shipment else None,
+        "pickup_lat": float(shipment.pickup_lat) if shipment and shipment.pickup_lat is not None else None,
+        "pickup_lng": float(shipment.pickup_lng) if shipment and shipment.pickup_lng is not None else None,
+        "destination_lat": float(shipment.destination_lat) if shipment and shipment.destination_lat is not None else None,
+        "destination_lng": float(shipment.destination_lng) if shipment and shipment.destination_lng is not None else None,
+        "current_lat": current_lat,
+        "current_lng": current_lng,
         "current_region": checkpoint,
         "eta_minutes": shipment.estimated_duration_minutes if shipment else None,
         "route_label": route_label,

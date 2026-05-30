@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AuthLayout, ProtectedLayout } from '@/layouts/AuthLayout'
 import { AppLayout } from '@/layouts/AppLayout'
+import { RoleGuard } from '@/components/shared/RoleGuard'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -12,6 +13,7 @@ import AuctionsPage from '@/pages/AuctionsPage'
 import SharedCargoPage from '@/pages/SharedCargoPage'
 import PaymentsPage from '@/pages/PaymentsPage'
 import FleetPage from '@/pages/FleetPage'
+import TrackPage from '@/pages/TrackPage'
 import ProviderRegisterPage from '@/pages/ProviderRegisterPage'
 import AdminProvidersPage from '@/pages/admin/AdminProvidersPage'
 import AdminShipmentsPage from '@/pages/admin/AdminShipmentsPage'
@@ -32,18 +34,32 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { path: '/dashboard', element: <DashboardPage /> },
+          { path: '/track', element: <TrackPage /> },
           { path: '/shipments', element: <ShipmentsPage /> },
-          { path: '/shipments/create', element: <CreateShipmentPage /> },
           { path: '/shipments/:id', element: <ShipmentDetailPage /> },
+          {
+            element: <RoleGuard allow={['customer', 'admin']} />,
+            children: [{ path: '/shipments/create', element: <CreateShipmentPage /> }],
+          },
           { path: '/marketplace', element: <MarketplacePage /> },
           { path: '/auctions', element: <AuctionsPage /> },
           { path: '/shared-cargo', element: <SharedCargoPage /> },
           { path: '/payments', element: <PaymentsPage /> },
-          { path: '/fleet', element: <FleetPage /> },
-          { path: '/provider/register', element: <ProviderRegisterPage /> },
-          { path: '/admin/providers', element: <AdminProvidersPage /> },
-          { path: '/admin/shipments', element: <AdminShipmentsPage /> },
-          { path: '/admin/users', element: <AdminUsersPage /> },
+          {
+            element: <RoleGuard allow={['provider', 'admin']} />,
+            children: [
+              { path: '/fleet', element: <FleetPage /> },
+              { path: '/provider/register', element: <ProviderRegisterPage /> },
+            ],
+          },
+          {
+            element: <RoleGuard allow={['admin']} />,
+            children: [
+              { path: '/admin/providers', element: <AdminProvidersPage /> },
+              { path: '/admin/shipments', element: <AdminShipmentsPage /> },
+              { path: '/admin/users', element: <AdminUsersPage /> },
+            ],
+          },
         ],
       },
     ],

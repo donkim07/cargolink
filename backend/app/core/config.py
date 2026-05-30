@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     google_maps_api_key: str = ""
 
-    ussd_code: str = "*384*123#"
+    ussd_code: str = "*384*93833#"
 
     @property
     def cors_origin_list(self) -> list[str]:

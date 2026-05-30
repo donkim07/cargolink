@@ -1,17 +1,23 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ColumnDef } from '@tanstack/react-table'
 import { adminApi, providersApi } from '@/services'
+import { AdminPageShell } from '@/components/admin/AdminPageShell'
+import { AdminRowActions } from '@/components/admin/AdminRowActions'
+import { DataTable } from '@/components/shared/DataTable'
 import { ShipmentStatusBadge } from '@/components/shared/ShipmentStatusBadge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { Shipment, ShipmentStatus } from '@/types'
 
 export default function AdminShipmentsPage() {
   const queryClient = useQueryClient()
-  const [assignShipmentId, setAssignShipmentId] = useState<string | null>(null)
+  const [assignId, setAssignId] = useState<string | null>(null)
+  const [editShipment, setEditShipment] = useState<Shipment | null>(null)
+  const [status, setStatus] = useState<ShipmentStatus>('pending')
   const [providerId, setProviderId] = useState('')
   const [vehicleId, setVehicleId] = useState('')
 
@@ -28,54 +34,74 @@ export default function AdminShipmentsPage() {
   const selectedProvider = providers.find((p) => p.id === providerId)
 
   const assign = useMutation({
-    mutationFn: () => adminApi.assignShipment(assignShipmentId!, providerId, vehicleId),
+    mutationFn: () => adminApi.assignShipment(assignId!, providerId, vehicleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-shipments'] })
-      setAssignShipmentId(null)
+      setAssignId(null)
       setProviderId('')
       setVehicleId('')
     },
   })
 
+  const updateShipment = useMutation({
+    mutationFn: () => adminApi.updateShipment(editShipment!.id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-shipments'] })
+      setEditShipment(null)
+    },
+  })
+
+  const cancelShipment = useMutation({
+    mutationFn: (id: string) => adminApi.deleteShipment(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-shipments'] }),
+  })
+
+  const columns: ColumnDef<Shipment>[] = [
+    {
+      id: 'route',
+      header: 'Route',
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium truncate max-w-[180px]">{row.original.pickup_address}</p>
+          <p className="text-xs text-charcoal/50 truncate max-w-[180px]">→ {row.original.destination_address}</p>
+        </div>
+      ),
+    },
+    { id: 'cargo', header: 'Cargo', cell: ({ row }) => <span className="capitalize">{row.original.cargo_type}</span> },
+    { id: 'status', header: 'Status', cell: ({ row }) => <ShipmentStatusBadge status={row.original.status} /> },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex flex-wrap items-center gap-1">
+          <AdminRowActions
+            viewTo={`/shipments/${row.original.id}`}
+            onEdit={() => {
+              setEditShipment(row.original)
+              setStatus(row.original.status)
+            }}
+            onDelete={() => {
+              if (confirm('Cancel this shipment?')) cancelShipment.mutate(row.original.id)
+            }}
+            deleteLabel=""
+          />
+          {row.original.status !== 'booked' && row.original.status !== 'delivered' && (
+            <Button size="sm" variant="outline" onClick={() => setAssignId(row.original.id)}>
+              Assign
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ]
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Shipment Management</h1>
-        <p className="text-charcoal/60">View all shipments and assign providers</p>
-      </div>
+    <AdminPageShell title="Shipments" description="View, edit, assign, and cancel all shipments">
+      <DataTable columns={columns} data={shipments} />
 
-      <div className="space-y-3">
-        {shipments.map((s) => (
-          <Card key={s.id}>
-            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <ShipmentStatusBadge status={s.status} />
-                  <span className="text-xs text-charcoal/50 capitalize">{s.cargo_type}</span>
-                </div>
-                <p className="mt-1 truncate font-medium">{s.pickup_address}</p>
-                <p className="truncate text-sm text-charcoal/50">→ {s.destination_address}</p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link to={`/shipments/${s.id}`}>View</Link>
-                </Button>
-                {s.status !== 'booked' && s.status !== 'delivered' && (
-                  <Button size="sm" onClick={() => setAssignShipmentId(s.id)}>
-                    Assign Provider
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Dialog open={!!assignShipmentId} onOpenChange={(o) => !o && setAssignShipmentId(null)}>
+      <Dialog open={!!assignId} onOpenChange={(o) => !o && setAssignId(null)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Provider</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Assign Provider</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Provider</Label>
@@ -95,24 +121,45 @@ export default function AdminShipmentsPage() {
                   <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select vehicle" /></SelectTrigger>
                   <SelectContent>
                     {selectedProvider.vehicles?.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.plate_number} — {v.type.replace('_', ' ')}
-                      </SelectItem>
+                      <SelectItem key={v.id} value={v.id}>{v.plate_number}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
-            <Button
-              className="w-full"
-              disabled={!providerId || !vehicleId || assign.isPending}
-              onClick={() => assign.mutate()}
-            >
+            <Button className="w-full" disabled={!providerId || !vehicleId || assign.isPending} onClick={() => assign.mutate()}>
               Confirm Assignment
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <Dialog open={!!editShipment} onOpenChange={(o) => !o && setEditShipment(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Shipment Status</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as ShipmentStatus)}>
+                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(['pending', 'quoted', 'booked', 'in_transit', 'delivered', 'cancelled'] as ShipmentStatus[]).map((s) => (
+                    <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={() => updateShipment.mutate()} disabled={updateShipment.isPending}>
+              Save
+            </Button>
+            {editShipment && (
+              <Button variant="outline" className="w-full" asChild>
+                <Link to={`/shipments/${editShipment.id}`}>View full details</Link>
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </AdminPageShell>
   )
 }

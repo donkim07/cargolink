@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.enums import UserRole
+from app.models.enums import ShipmentStatus, UserRole
 
 
 class UserAdminResponse(BaseModel):
@@ -43,3 +43,20 @@ class AnalyticsResponse(BaseModel):
 class AssignShipmentRequest(BaseModel):
     provider_id: UUID
     vehicle_id: UUID
+
+
+class UserAdminUpdate(BaseModel):
+    full_name: str | None = None
+    email: str | None = None
+    role: UserRole | None = None
+    is_active: bool | None = None
+    is_verified: bool | None = None
+
+
+class ProviderAdminUpdate(BaseModel):
+    company_name: str | None = None
+    is_approved: bool | None = None
+
+
+class ShipmentAdminUpdate(BaseModel):
+    status: ShipmentStatus | None = None

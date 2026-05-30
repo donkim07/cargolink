@@ -70,10 +70,20 @@ export const searchApi = {
 export const adminApi = {
   analytics: () => api.get<AdminAnalytics>('/admin/analytics'),
   listUsers: () => api.get<AdminUser[]>('/admin/users'),
+  getUser: (id: string) => api.get<AdminUser>(`/admin/users/${id}`),
+  updateUser: (id: string, data: Record<string, unknown>) => api.patch<AdminUser>(`/admin/users/${id}`, data),
+  deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
   listProviders: (approved?: boolean) =>
     api.get<AdminProvider[]>('/admin/providers', { params: approved !== undefined ? { approved } : {} }),
+  updateProvider: (id: string, data: Record<string, unknown>) =>
+    api.patch<AdminProvider>(`/admin/providers/${id}`, data),
+  deleteProvider: (id: string) => api.delete(`/admin/providers/${id}`),
   approveProvider: (id: string) => api.post<AdminProvider>(`/admin/providers/${id}/approve`),
   listShipments: () => api.get<Shipment[]>('/admin/shipments'),
+  getShipment: (id: string) => api.get<Shipment>(`/admin/shipments/${id}`),
+  updateShipment: (id: string, data: Record<string, unknown>) =>
+    api.patch<Shipment>(`/admin/shipments/${id}`, data),
+  deleteShipment: (id: string) => api.delete(`/admin/shipments/${id}`),
   assignShipment: (shipmentId: string, providerId: string, vehicleId: string) =>
     api.post(`/admin/shipments/${shipmentId}/assign`, { provider_id: providerId, vehicle_id: vehicleId }),
   seedDemo: () => api.post('/admin/seed-demo'),

@@ -49,6 +49,79 @@ async def list_all_shipments(db: AsyncSession) -> list[Shipment]:
     return list(result.scalars().all())
 
 
+async def get_user(user_id: UUID, db: AsyncSession) -> User:
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
+
+
+async def update_user(user_id: UUID, data: dict, db: AsyncSession) -> User:
+    user = await get_user(user_id, db)
+    for key, value in data.items():
+        if value is not None and hasattr(user, key):
+            setattr(user, key, value)
+    await db.flush()
+    return user
+
+
+async def delete_user(user_id: UUID, db: AsyncSession) -> None:
+    user = await get_user(user_id, db)
+    user.is_active = False
+    await db.flush()
+
+
+async def update_provider(provider_id: UUID, data: dict, db: AsyncSession) -> Provider:
+    result = await db.execute(
+        select(Provider).options(selectinload(Provider.user)).where(Provider.id == provider_id)
+    )
+    provider = result.scalar_one_or_none()
+    if provider is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
+    if "company_name" in data and data["company_name"] is not None:
+        provider.company_name = data["company_name"]
+    if "is_approved" in data and data["is_approved"] is not None:
+        provider.is_approved = data["is_approved"]
+    await db.flush()
+    return provider
+
+
+async def delete_provider(provider_id: UUID, db: AsyncSession) -> None:
+    result = await db.execute(select(Provider).where(Provider.id == provider_id))
+    provider = result.scalar_one_or_none()
+    if provider is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
+    provider.is_approved = False
+    await db.flush()
+
+
+async def get_shipment(shipment_id: UUID, db: AsyncSession) -> Shipment:
+    result = await db.execute(
+        select(Shipment)
+        .options(selectinload(Shipment.customer), selectinload(Shipment.bookings))
+        .where(Shipment.id == shipment_id)
+    )
+    shipment = result.scalar_one_or_none()
+    if shipment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found")
+    return shipment
+
+
+async def update_shipment(shipment_id: UUID, data: dict, db: AsyncSession) -> Shipment:
+    shipment = await get_shipment(shipment_id, db)
+    if "status" in data and data["status"] is not None:
+        shipment.status = data["status"]
+    await db.flush()
+    return shipment
+
+
+async def delete_shipment(shipment_id: UUID, db: AsyncSession) -> None:
+    shipment = await get_shipment(shipment_id, db)
+    shipment.status = ShipmentStatus.CANCELLED
+    await db.flush()
+
+
 async def get_analytics(db: AsyncSession) -> dict:
     users = await db.scalar(select(func.count(User.id))) or 0
     providers = await db.scalar(select(func.count(Provider.id))) or 0

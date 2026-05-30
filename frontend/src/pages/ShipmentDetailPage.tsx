@@ -5,6 +5,7 @@ import { MapPin, CreditCard, AlertTriangle, Truck } from 'lucide-react'
 import { shipmentsApi, trackingApi } from '@/services'
 import { useAuth } from '@/context/AuthContext'
 import { TrackingTimeline } from '@/components/shared/TrackingTimeline'
+import { ShipmentTrackingMap } from '@/components/shared/ShipmentTrackingMap'
 import { ShipmentStatusBadge } from '@/components/shared/ShipmentStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +26,14 @@ interface RouteRisk {
 interface TrackingInfo {
   tracking_code: string
   booking_status: string
+  pickup?: string | null
+  destination?: string | null
+  pickup_lat?: number | null
+  pickup_lng?: number | null
+  destination_lat?: number | null
+  destination_lng?: number | null
+  current_lat?: number | null
+  current_lng?: number | null
   current_region?: string | null
   route_label?: string
   risks?: RouteRisk[]
@@ -91,11 +100,18 @@ export default function ShipmentDetailPage() {
             </p>
           )}
         </div>
-        {booking && user?.role === 'customer' && (
-          <Button asChild>
-            <Link to="/payments"><CreditCard className="h-4 w-4" /> Pay Now</Link>
+        <div className="flex flex-wrap gap-2">
+        {booking && (
+          <Button variant="outline" asChild>
+            <Link to="/track" state={{ code: booking.tracking_code }}>Track on Map</Link>
           </Button>
         )}
+        {booking && user?.role === 'customer' && (
+          <Button asChild>
+            <Link to={`/payments?bookingId=${booking.id}`}><CreditCard className="h-4 w-4" /> Pay Now</Link>
+          </Button>
+        )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -125,6 +141,23 @@ export default function ShipmentDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {(tracking || (shipment.pickup_lat && shipment.destination_lat)) && (
+            <ShipmentTrackingMap
+              data={{
+                pickup: tracking?.pickup ?? shipment.pickup_address,
+                destination: tracking?.destination ?? shipment.destination_address,
+                pickup_lat: tracking?.pickup_lat ?? shipment.pickup_lat,
+                pickup_lng: tracking?.pickup_lng ?? shipment.pickup_lng,
+                destination_lat: tracking?.destination_lat ?? shipment.destination_lat,
+                destination_lng: tracking?.destination_lng ?? shipment.destination_lng,
+                current_lat: tracking?.current_lat,
+                current_lng: tracking?.current_lng,
+                current_region: tracking?.current_region,
+                booking_status: tracking?.booking_status ?? booking?.status,
+              }}
+            />
+          )}
 
           {tracking?.risks && tracking.risks.length > 0 && (
             <Card className="border-amber/20">
