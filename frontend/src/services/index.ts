@@ -10,6 +10,8 @@ import type {
   Payment,
   Provider,
   ProviderDashboard,
+  Driver,
+  DriverJob,
   QuoteItem,
   SharedCargoListing,
   Shipment,
@@ -52,8 +54,20 @@ export const providersApi = {
   register: (data: Record<string, unknown>) => api.post<Provider>('/providers/register', data),
   dashboard: () => api.get<ProviderDashboard>('/providers/dashboard'),
   addVehicle: (data: Record<string, unknown>) => api.post<Vehicle>('/providers/vehicles', data),
+  addDriver: (data: { phone: string; license_number: string; full_name?: string }) =>
+    api.post<Driver>('/providers/drivers', data),
+  listDrivers: (providerId?: string) =>
+    providerId
+      ? api.get<Driver[]>(`/providers/${providerId}/drivers`)
+      : api.get<Driver[]>('/providers/drivers'),
   book: (shipmentId: string, providerId: string, vehicleId: string) =>
     api.post(`/providers/book/${shipmentId}/${providerId}/${vehicleId}`),
+}
+
+export const driversApi = {
+  me: () => api.get<Driver | null>('/drivers/me'),
+  jobs: () => api.get<DriverJob[]>('/drivers/jobs'),
+  accept: (bookingId: string) => api.post(`/drivers/jobs/${bookingId}/accept`),
 }
 
 export const notificationsApi = {
@@ -84,8 +98,12 @@ export const adminApi = {
   updateShipment: (id: string, data: Record<string, unknown>) =>
     api.patch<Shipment>(`/admin/shipments/${id}`, data),
   deleteShipment: (id: string) => api.delete(`/admin/shipments/${id}`),
-  assignShipment: (shipmentId: string, providerId: string, vehicleId: string) =>
-    api.post(`/admin/shipments/${shipmentId}/assign`, { provider_id: providerId, vehicle_id: vehicleId }),
+  assignShipment: (shipmentId: string, providerId: string, vehicleId: string, driverId?: string) =>
+    api.post(`/admin/shipments/${shipmentId}/assign`, {
+      provider_id: providerId,
+      vehicle_id: vehicleId,
+      driver_id: driverId,
+    }),
   seedDemo: () => api.post('/admin/seed-demo'),
 }
 

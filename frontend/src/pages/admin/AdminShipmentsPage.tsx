@@ -20,6 +20,7 @@ export default function AdminShipmentsPage() {
   const [status, setStatus] = useState<ShipmentStatus>('pending')
   const [providerId, setProviderId] = useState('')
   const [vehicleId, setVehicleId] = useState('')
+  const [driverId, setDriverId] = useState('')
 
   const { data: shipments = [] } = useQuery({
     queryKey: ['admin-shipments'],
@@ -33,13 +34,20 @@ export default function AdminShipmentsPage() {
 
   const selectedProvider = providers.find((p) => p.id === providerId)
 
+  const { data: providerDrivers = [] } = useQuery({
+    queryKey: ['provider-drivers', providerId],
+    queryFn: () => providersApi.listDrivers(providerId).then((r) => r.data),
+    enabled: !!providerId,
+  })
+
   const assign = useMutation({
-    mutationFn: () => adminApi.assignShipment(assignId!, providerId, vehicleId),
+    mutationFn: () => adminApi.assignShipment(assignId!, providerId, vehicleId, driverId || undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-shipments'] })
       setAssignId(null)
       setProviderId('')
       setVehicleId('')
+      setDriverId('')
     },
   })
 
@@ -101,11 +109,11 @@ export default function AdminShipmentsPage() {
 
       <Dialog open={!!assignId} onOpenChange={(o) => !o && setAssignId(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Assign Provider</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Assign Provider & Driver</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Provider</Label>
-              <Select value={providerId} onValueChange={(v) => { setProviderId(v); setVehicleId('') }}>
+              <Label>Transport Provider</Label>
+              <Select value={providerId} onValueChange={(v) => { setProviderId(v); setVehicleId(''); setDriverId('') }}>
                 <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select provider" /></SelectTrigger>
                 <SelectContent>
                   {providers.map((p) => (
@@ -122,6 +130,20 @@ export default function AdminShipmentsPage() {
                   <SelectContent>
                     {selectedProvider.vehicles?.map((v) => (
                       <SelectItem key={v.id} value={v.id}>{v.plate_number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {providerId && (
+              <div>
+                <Label>Driver (optional — or let first driver accept)</Label>
+                <Select value={driverId} onValueChange={setDriverId}>
+                  <SelectTrigger className="mt-1.5"><SelectValue placeholder="Auto — notify all drivers" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Auto — first driver accepts</SelectItem>
+                    {providerDrivers.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.full_name ?? d.phone}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

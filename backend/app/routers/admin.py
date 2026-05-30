@@ -196,5 +196,5 @@ async def assign_shipment(
     db: AsyncSession = Depends(get_db),
 ):
     return await admin_service.assign_shipment_to_provider(
-        shipment_id, data.provider_id, data.vehicle_id, db
+        shipment_id, data.provider_id, data.vehicle_id, db, data.driver_id
     )

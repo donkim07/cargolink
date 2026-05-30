@@ -19,6 +19,7 @@ from app.models.provider import Provider
 from app.models.shipment import Shipment
 from app.models.user import User
 from app.services.route_intelligence import analyze_route, format_route_label, get_community_risks
+from app.services import drivers as driver_service
 from app.services.sms import (
     send_delivered_with_otp,
     send_driver_accepted,
@@ -187,6 +188,7 @@ async def update_booking_status(
 ) -> Booking:
     booking = await get_booking_by_tracking(tracking_code, db)
     shipment = booking.shipment
+    driver_record = None
 
     if current_user.role not in (UserRole.ADMIN, UserRole.PROVIDER, UserRole.DRIVER):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
@@ -197,19 +199,40 @@ async def update_booking_status(
         if provider is None or booking.provider_id != provider.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your booking")
 
+    if current_user.role == UserRole.DRIVER:
+        driver_record = await driver_service.get_driver_for_user(current_user, db)
+        if driver_record is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Driver profile not found")
+        if booking.driver_id != driver_record.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your assigned delivery")
+
     customer = shipment.customer if shipment else None
     route_label = format_route_label(
         shipment.pickup_address if shipment else None,
         shipment.destination_address if shipment else None,
     )
 
-    if new_status == BookingStatus.CONFIRMED and booking.status == BookingStatus.PENDING:
+    current = booking.status
+
+    if new_status == BookingStatus.CONFIRMED:
+        if current != BookingStatus.PENDING:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cargo already accepted")
+        if booking.driver_id is None and current_user.role == UserRole.DRIVER and driver_record:
+            booking = await driver_service.accept_job(booking.id, driver_record, db)
+            return booking
+        if booking.driver_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Assign a driver first, or wait for a driver to accept the job",
+            )
         booking.status = BookingStatus.CONFIRMED
         if shipment:
             shipment.status = ShipmentStatus.BOOKED
         await notify_booking_accepted(booking, db)
 
     elif new_status == BookingStatus.IN_TRANSIT:
+        if current != BookingStatus.CONFIRMED:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start trip only after cargo is accepted")
         booking.status = BookingStatus.IN_TRANSIT
         if shipment:
             shipment.status = ShipmentStatus.IN_TRANSIT
@@ -225,6 +248,8 @@ async def update_booking_status(
             )
 
     elif new_status == BookingStatus.DELIVERED:
+        if current != BookingStatus.IN_TRANSIT:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mark delivered only after trip started")
         stored_otp = await get_delivery_otp(booking.id)
         if stored_otp and delivery_otp and delivery_otp != stored_otp:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid delivery OTP")
@@ -233,6 +258,11 @@ async def update_booking_status(
         booking.delivered_at = datetime.now(UTC)
         if shipment:
             shipment.status = ShipmentStatus.DELIVERED
+        if booking.driver_id:
+            driver_result = await db.execute(select(Driver).where(Driver.id == booking.driver_id))
+            assigned_driver = driver_result.scalar_one_or_none()
+            if assigned_driver:
+                assigned_driver.is_available = True
         if customer:
             otp = stored_otp or await generate_delivery_otp(booking.id)
             await send_delivered_with_otp(customer.phone, booking.tracking_code, otp, db)
@@ -246,7 +276,7 @@ async def update_booking_status(
             )
 
     else:
-        booking.status = new_status
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
 
     await db.flush()
     return booking
@@ -264,6 +294,16 @@ async def update_checkpoint(
 
     if current_user.role not in (UserRole.ADMIN, UserRole.PROVIDER, UserRole.DRIVER):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    if current_user.role == UserRole.DRIVER:
+        driver_record = await driver_service.get_driver_for_user(current_user, db)
+        if driver_record is None or booking.driver_id != driver_record.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your assigned delivery")
+    elif current_user.role == UserRole.PROVIDER:
+        provider_result = await db.execute(select(Provider).where(Provider.user_id == current_user.id))
+        provider = provider_result.scalar_one_or_none()
+        if provider is None or booking.provider_id != provider.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your booking")
 
     redis = await get_redis()
     await redis.set(_checkpoint_key(booking.id), region, ex=60 * 60 * 48)

@@ -57,6 +57,22 @@
   background: rgb(40 33% 94% / 0.8);
 }
 
+.goog-te-banner-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.skiptranslate iframe {
+  display: none !important;
+}
+
+body {
+  top: 0 !important;
+}
+
+#google_translate_element,
+.skiptranslate {
+  display: none !important;
+}
+
 @layer utilities {
   .text-muted-foreground {
     @apply text-charcoal/60;

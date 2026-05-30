@@ -195,6 +195,10 @@ async def select_winner(
     db.add(booking)
     await db.flush()
 
+    from app.services import drivers as driver_service
+
+    await driver_service.notify_provider_drivers_new_job(booking, db)
+
     if provider.user:
         await send_auction_won(provider.user.phone, db)
 

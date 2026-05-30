@@ -22,6 +22,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SearchBar } from '@/components/shared/SearchBar'
 import { NotificationsDropdown } from '@/components/shared/NotificationsDropdown'
+import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher'
+import { HelpChatbot } from '@/components/shared/HelpChatbot'
 import { cn } from '@/utils/cn'
 import type { UserRole } from '@/types'
 
@@ -196,12 +198,25 @@ export function AppLayout() {
             <Menu className="h-5 w-5" />
           </Button>
           <SearchBar />
+          <LanguageSwitcher compact />
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              cn(
+                'hidden shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium sm:inline-flex',
+                isActive ? 'bg-forest/10 text-forest' : 'text-charcoal/60 hover:text-charcoal'
+              )
+            }
+          >
+            Profile
+          </NavLink>
           <NotificationsDropdown />
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <Outlet />
         </main>
+        <HelpChatbot />
       </div>
     </div>
   )

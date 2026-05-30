@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { PlusCircle } from 'lucide-react'
-import { shipmentsApi } from '@/services'
+import { shipmentsApi, driversApi } from '@/services'
 import { useAuth } from '@/context/AuthContext'
 import { DataTable } from '@/components/shared/DataTable'
 import { ShipmentStatusBadge } from '@/components/shared/ShipmentStatusBadge'
@@ -72,6 +72,12 @@ export default function ShipmentsPage() {
     queryFn: () => shipmentsApi.list().then((r) => r.data),
   })
 
+  const { data: driverJobs = [] } = useQuery({
+    queryKey: ['driver-jobs'],
+    queryFn: () => driversApi.jobs().then((r) => r.data),
+    enabled: role === 'driver',
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -92,6 +98,26 @@ export default function ShipmentsPage() {
             As a customer you can: create shipments and get quotes, book a provider from quotes or marketplace,
             run reverse auctions, book shared cargo space, pay via mobile money, and track deliveries on the map.
             You cannot manage fleet, approve providers, or publish shared cargo listings.
+          </CardContent>
+        </Card>
+      )}
+
+      {role === 'driver' && driverJobs.length > 0 && (
+        <Card className="border-amber/30">
+          <CardContent className="space-y-3 p-4">
+            <p className="font-medium">Available jobs — accept one delivery at a time</p>
+            {driverJobs.map((job) => (
+              <div key={job.booking_id} className="flex flex-col gap-2 rounded-lg border border-forest/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium">{job.pickup_address}</p>
+                  <p className="text-xs text-charcoal/50">→ {job.destination_address}</p>
+                  <p className="text-xs text-charcoal/40">#{job.tracking_code}</p>
+                </div>
+                <Button size="sm" asChild>
+                  <Link to={`/shipments/${job.shipment_id}`}>View & Accept</Link>
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

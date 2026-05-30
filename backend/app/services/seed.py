@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models.driver import Driver
 from app.models.enums import UserRole, VehicleType
 from app.models.provider import Provider
 from app.models.shared_cargo import SharedCargo
@@ -87,6 +88,29 @@ async def seed_demo_data(db: AsyncSession) -> None:
                 )
             )
         created_providers.append(provider)
+
+    if created_providers:
+        p = created_providers[0]
+        for idx, (phone, name) in enumerate(
+            [("+255711111101", "Juma Mwangi"), ("+255711111102", "Asha Hassan")],
+            start=1,
+        ):
+            driver_user = User(
+                phone=phone,
+                full_name=name,
+                role=UserRole.DRIVER,
+                is_verified=True,
+            )
+            db.add(driver_user)
+            await db.flush()
+            db.add(
+                Driver(
+                    provider_id=p.id,
+                    user_id=driver_user.id,
+                    license_number=f"DL-{idx:04d}",
+                    is_available=True,
+                )
+            )
 
     # Admin user
     admin_exists = await db.scalar(select(User.id).where(User.role == UserRole.ADMIN))

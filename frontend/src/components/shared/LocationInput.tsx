@@ -21,7 +21,7 @@ interface LocationInputProps {
 }
 
 interface Prediction {
-  place_id: string
+  placeId: string
   description: string
 }
 
@@ -34,6 +34,7 @@ export function LocationInput({
   className,
 }: LocationInputProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null)
   const debounceRef = useRef<number | undefined>(undefined)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -44,7 +45,9 @@ export function LocationInput({
 
   useEffect(() => {
     loadGoogleMaps()
-      .then(() => {
+      .then(async () => {
+        const places = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
+        sessionTokenRef.current = new places.AutocompleteSessionToken()
         setReady(true)
         setMapsError(null)
       })
@@ -54,77 +57,77 @@ export function LocationInput({
       })
   }, [])
 
-  const selectPrediction = useCallback((prediction: Prediction) => {
-    const service = new google.maps.places.PlacesService(document.createElement('div'))
-    service.getDetails(
-      { placeId: prediction.place_id, fields: ['formatted_address', 'geometry', 'name'] },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          onChangeRef.current({
-            address: place.formatted_address ?? place.name ?? prediction.description,
-            lat: place.geometry?.location?.lat(),
-            lng: place.geometry?.location?.lng(),
-          })
-        } else {
-          onChangeRef.current({ address: prediction.description })
-        }
-        setOpen(false)
-        setPredictions([])
-      }
-    )
-  }, [])
-
-  const requestPredictions = useCallback((input: string, restrictCountry: boolean) => {
-    const service = new google.maps.places.AutocompleteService()
-    const request: google.maps.places.AutocompletionRequest = {
-      input,
-      ...(restrictCountry ? { componentRestrictions: { country: 'tz' } } : {}),
-    }
-
-    service.getPlacePredictions(request, (results, status) => {
-      const ok =
-        status === google.maps.places.PlacesServiceStatus.OK ||
-        status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS
-
-      if (!ok) {
-        if (restrictCountry) {
-          requestPredictions(input, false)
-          return
-        }
-        if (status === google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
-          setMapsError('Places API access denied — enable Places API on your Google key')
-        }
-        setPredictions([])
-        setOpen(false)
-        return
-      }
-
-      if (!results?.length) {
-        if (restrictCountry) {
-          requestPredictions(input, false)
-          return
-        }
-        setPredictions([])
-        setOpen(false)
-        return
-      }
-
-      setPredictions(results.map((r) => ({ place_id: r.place_id, description: r.description })))
-      setOpen(true)
+  const selectPrediction = useCallback(async (prediction: Prediction) => {
+    try {
+      const places = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
+      const place = new places.Place({ id: prediction.placeId })
+      await place.fetchFields({ fields: ['formattedAddress', 'location', 'displayName'] })
+      const loc = place.location
+      onChangeRef.current({
+        address: place.formattedAddress ?? place.displayName ?? prediction.description,
+        lat: loc?.lat(),
+        lng: loc?.lng(),
+      })
+      sessionTokenRef.current = new places.AutocompleteSessionToken()
       setMapsError(null)
-    })
+    } catch {
+      onChangeRef.current({ address: prediction.description })
+    }
+    setOpen(false)
+    setPredictions([])
   }, [])
 
   const fetchPredictions = useCallback(
-    (input: string) => {
+    async (input: string) => {
       if (!ready || input.trim().length < 2) {
         setPredictions([])
         setOpen(false)
         return
       }
-      requestPredictions(input.trim(), true)
+
+      try {
+        const places = (await google.maps.importLibrary('places')) as google.maps.PlacesLibrary
+        if (!sessionTokenRef.current) {
+          sessionTokenRef.current = new places.AutocompleteSessionToken()
+        }
+
+        const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: input.trim(),
+          sessionToken: sessionTokenRef.current,
+          includedRegionCodes: ['tz'],
+        })
+
+        const items = suggestions
+          .map((s) => s.placePrediction)
+          .filter(Boolean)
+          .map((p) => ({
+            placeId: p!.placeId,
+            description: p!.text.text,
+          }))
+
+        if (!items.length) {
+          const fallback = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+            input: input.trim(),
+            sessionToken: sessionTokenRef.current,
+          })
+          setPredictions(
+            fallback.suggestions
+              .map((s) => s.placePrediction)
+              .filter(Boolean)
+              .map((p) => ({ placeId: p!.placeId, description: p!.text.text }))
+          )
+        } else {
+          setPredictions(items)
+        }
+        setOpen(true)
+        setMapsError(null)
+      } catch (err) {
+        setPredictions([])
+        setOpen(false)
+        setMapsError(err instanceof Error ? err.message : 'Places autocomplete unavailable')
+      }
     },
-    [ready, requestPredictions]
+    [ready]
   )
 
   const handleInputChange = (address: string) => {
@@ -160,13 +163,13 @@ export function LocationInput({
           {open && predictions.length > 0 && (
             <ul className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-56 overflow-y-auto rounded-lg border border-forest/10 bg-white shadow-lg">
               {predictions.map((prediction) => (
-                <li key={prediction.place_id}>
+                <li key={prediction.placeId}>
                   <button
                     type="button"
                     className="w-full px-3 py-2.5 text-left text-sm hover:bg-canvas/80"
                     onMouseDown={(e) => {
                       e.preventDefault()
-                      selectPrediction(prediction)
+                      void selectPrediction(prediction)
                     }}
                   >
                     {prediction.description}

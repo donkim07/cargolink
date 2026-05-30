@@ -15,8 +15,8 @@ from app.models.provider import Provider
 from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.schemas.provider import ProviderDashboard, ProviderRegister, VehicleCreate
+from app.services import drivers as driver_service
 from app.services.pricing import calculate_cost
-from app.services.tracking import notify_booking_accepted
 
 
 async def list_providers(
@@ -193,6 +193,18 @@ async def book_with_provider(
     from app.services.shipments import get_shipment
 
     shipment = await get_shipment(shipment_id, current_user, db)
+    if shipment.status in (ShipmentStatus.BOOKED, ShipmentStatus.IN_TRANSIT, ShipmentStatus.DELIVERED):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipment already booked")
+
+    existing_booking = await db.execute(
+        select(Booking).where(
+            Booking.shipment_id == shipment.id,
+            Booking.status.notin_([BookingStatus.CANCELLED, BookingStatus.DELIVERED]),
+        )
+    )
+    if existing_booking.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipment already has an active booking")
+
     provider = await get_provider(provider_id, db)
 
     vehicle_result = await db.execute(
@@ -224,12 +236,27 @@ async def book_with_provider(
         insurance_fee=Decimal(str(pricing["insurance_fee"])),
         total_cost=Decimal(str(pricing["total_cost"])),
         tracking_code=tracking_code,
+        status=BookingStatus.PENDING,
     )
-    shipment.status = ShipmentStatus.BOOKED
+    shipment.status = ShipmentStatus.QUOTED
     db.add(booking)
     await db.flush()
 
-    await notify_booking_accepted(booking, db)
+    await driver_service.notify_provider_drivers_new_job(booking, db)
+
+    if shipment.customer:
+        db.add(
+            Notification(
+                user_id=shipment.customer.id,
+                type=NotificationType.BOOKING_UPDATE,
+                title="Provider Selected",
+                message=(
+                    f"{provider.company_name} will assign a driver for #{tracking_code}. "
+                    "You will receive SMS when a driver accepts."
+                ),
+            )
+        )
+        await db.flush()
 
     return booking
 

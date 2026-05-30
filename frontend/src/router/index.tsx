@@ -14,6 +14,7 @@ import SharedCargoPage from '@/pages/SharedCargoPage'
 import PaymentsPage from '@/pages/PaymentsPage'
 import FleetPage from '@/pages/FleetPage'
 import TrackPage from '@/pages/TrackPage'
+import ProfilePage from '@/pages/ProfilePage'
 import ProviderRegisterPage from '@/pages/ProviderRegisterPage'
 import AdminProvidersPage from '@/pages/admin/AdminProvidersPage'
 import AdminShipmentsPage from '@/pages/admin/AdminShipmentsPage'
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/dashboard', element: <DashboardPage /> },
           { path: '/track', element: <TrackPage /> },
+          { path: '/profile', element: <ProfilePage /> },
           { path: '/shipments', element: <ShipmentsPage /> },
           { path: '/shipments/:id', element: <ShipmentDetailPage /> },
           {

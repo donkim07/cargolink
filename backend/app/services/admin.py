@@ -151,6 +151,7 @@ async def assign_shipment_to_provider(
     provider_id: UUID,
     vehicle_id: UUID,
     db: AsyncSession,
+    driver_id: UUID | None = None,
 ) -> dict:
     from app.services.providers import book_with_provider
 
@@ -160,6 +161,11 @@ async def assign_shipment_to_provider(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No admin user found")
 
     booking = await book_with_provider(shipment_id, provider_id, vehicle_id, admin, db)
+
+    if driver_id:
+        from app.services import drivers as driver_service
+
+        booking = await driver_service.assign_driver_to_booking(booking.id, driver_id, db)
 
     customer_result = await db.execute(
         select(Shipment).options(selectinload(Shipment.customer)).where(Shipment.id == shipment_id)

@@ -6,13 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.enums import NotificationType, ShipmentStatus, UserRole, VehicleType
+from app.models.enums import BookingStatus, NotificationType, ShipmentStatus, UserRole, VehicleType
 from app.models.notification import Notification
 from app.models.provider import Provider
 from app.models.shipment import Shipment
 from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.schemas.shipment import QuoteItem, ShipmentCreate, ShipmentQuoteResponse
+from app.services import drivers as driver_service
 from app.services.maps import geocode_address, get_distance_and_duration
 from app.services.pricing import calculate_cost, recommend_vehicle_type
 
@@ -91,6 +92,15 @@ async def list_shipments(current_user: User, db: AsyncSession) -> list[Shipment]
         from app.models.booking import Booking
 
         query = query.join(Booking).where(Booking.provider_id == provider.id)
+    elif current_user.role == UserRole.DRIVER:
+        from app.models.booking import Booking
+        from app.models.driver import Driver
+
+        driver_result = await db.execute(select(Driver).where(Driver.user_id == current_user.id))
+        driver = driver_result.scalar_one_or_none()
+        if driver is None:
+            return []
+        query = query.join(Booking).where(Booking.driver_id == driver.id)
     else:
         query = query.where(Shipment.customer_id == current_user.id)
 
@@ -117,6 +127,18 @@ async def get_shipment(shipment_id: UUID, current_user: User, db: AsyncSession) 
         provider_result = await db.execute(select(Provider).where(Provider.user_id == current_user.id))
         provider = provider_result.scalar_one_or_none()
         if provider and any(b.provider_id == provider.id for b in shipment.bookings):
+            return shipment
+    if current_user.role == UserRole.DRIVER:
+        from app.models.driver import Driver
+
+        driver_result = await db.execute(select(Driver).where(Driver.user_id == current_user.id))
+        driver = driver_result.scalar_one_or_none()
+        if driver and any(b.driver_id == driver.id for b in shipment.bookings):
+            return shipment
+        if driver and any(
+            b.provider_id == driver.provider_id and b.status == BookingStatus.PENDING and b.driver_id is None
+            for b in shipment.bookings
+        ):
             return shipment
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")

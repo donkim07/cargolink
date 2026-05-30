@@ -43,6 +43,7 @@ class AnalyticsResponse(BaseModel):
 class AssignShipmentRequest(BaseModel):
     provider_id: UUID
     vehicle_id: UUID
+    driver_id: UUID | None = None
 
 
 class UserAdminUpdate(BaseModel):

@@ -42,7 +42,9 @@ export default function MarketplacePage() {
       <div>
         <h1 className="font-display text-2xl font-bold">Marketplace</h1>
         <p className="text-charcoal/60">
-          {shipmentId ? 'Select a provider to book your shipment' : 'Browse verified transport providers'}
+          {shipmentId
+            ? 'Select a trusted transport provider — their drivers will be notified when you book'
+            : 'Browse verified transport companies and their fleets'}
         </p>
       </div>
 

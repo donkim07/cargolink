@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, get_db
 from app.core.redis import close_redis
-from app.routers import admin, auctions, auth, notifications, payments, providers, search, shared_cargo, shipments, tracking, ussd
+from app.routers import admin, auctions, auth, drivers, notifications, payments, providers, search, shared_cargo, shipments, tracking, ussd
 from app.routers.ussd import _parse_ussd_form, process_ussd
 from app.services.seed import seed_demo_data
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,7 @@ app.include_router(notifications.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(tracking.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(drivers.router, prefix="/api")
 app.include_router(ussd.router, prefix="/api")
 
 

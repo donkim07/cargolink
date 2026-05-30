@@ -77,6 +77,29 @@ export interface BookingSummary {
   status: string
   total_cost: number
   provider_id: string
+  driver_id?: string | null
+}
+
+export interface Driver {
+  id: string
+  provider_id: string
+  user_id: string
+  license_number: string
+  is_available: boolean
+  rating: number
+  full_name?: string | null
+  phone?: string | null
+  created_at: string
+}
+
+export interface DriverJob {
+  booking_id: string
+  shipment_id: string
+  tracking_code: string
+  pickup_address: string | null
+  destination_address: string | null
+  total_cost: number
+  status: string
 }
 
 export interface PriceBreakdown {
